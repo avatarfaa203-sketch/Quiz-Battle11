@@ -1,0 +1,6 @@
+{
+  "name": "Quiz Battle",
+  "description": "A competitive educational quiz battle game where students play quizzes, challenge friends, earn XP, level up, and compete on leaderboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
