@@ -241,6 +241,12 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Creator Credit & Branding */}
+      <div className="pt-4 text-center text-xs text-slate-400">
+        <p className="text-indigo-300 font-semibold mb-0.5">SHS Science Hub • Learn • Practice • Challenge • Achieve</p>
+        <p>Created & Developed by <strong className="text-indigo-400 font-bold">Avatar</strong></p>
+      </div>
     </div>
   );
 };

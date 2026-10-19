@@ -1,6 +1,8 @@
 import { Question, Subject } from '../types';
+import { SHS_CURRICULUM_QUESTIONS } from './shsCurriculumQuestions';
 
 export const DEFAULT_QUESTIONS: Question[] = [
+  ...SHS_CURRICULUM_QUESTIONS,
   // ================= MATHEMATICS =================
   {
     id: 'math-1',
@@ -1075,6 +1077,14 @@ export const DEFAULT_QUESTIONS: Question[] = [
 ];
 
 export const SUBJECTS: { id: Subject; name: string; icon: string; description: string; color: string; bgGradient: string }[] = [
+  {
+    id: 'Core Mathematics',
+    name: 'Core Mathematics',
+    icon: 'Calculator',
+    description: 'Algebra, geometry, trigonometry, modular arithmetic, and probability',
+    color: 'text-blue-400',
+    bgGradient: 'from-blue-600/20 to-indigo-600/10 border-blue-500/30'
+  },
   {
     id: 'Mathematics',
     name: 'Mathematics',

@@ -11,9 +11,12 @@ import {
   BrainCircuit, 
   Target, 
   Flame,
-  CheckCircle2
+  CheckCircle2,
+  GraduationCap,
+  Atom,
+  Award
 } from 'lucide-react';
-import { SUBJECTS } from '../../data/defaultQuestions';
+import { SHS_SUBJECTS } from '../../data/curriculum';
 import { soundEffects } from '../../utils/audio';
 
 interface HomeViewProps {
@@ -36,38 +39,38 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onOpenAuth }) =>
 
         <div className="relative z-10 max-w-3xl mx-auto text-center space-y-5">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-bold tracking-wide">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            Competitive High School Academic Arena
+            <Atom className="w-3.5 h-3.5 text-indigo-400" />
+            Ghanaian Senior High School Academic Platform
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white leading-tight">
-            QUIZ <span className="bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">BATTLE</span>
+            SHS <span className="bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">SCIENCE HUB</span>
           </h1>
 
-          <p className="text-lg sm:text-xl font-bold tracking-widest text-indigo-300 uppercase">
-            &ldquo;Challenge. Answer. Conquer.&rdquo;
+          <p className="text-base sm:text-lg font-extrabold tracking-widest text-indigo-300 uppercase">
+            Learn • Practice • Challenge • Achieve
           </p>
 
           <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto font-normal leading-relaxed">
-            Test your intellect against senior high school curriculum benchmarks in Mathematics, Sciences, Computing, and English. Earn XP, rise through gladiatorial ranks, and challenge classmates.
+            Curriculum-aligned practice in Core Mathematics, Additional Mathematics, Physics, Chemistry, and Biology. Master topics from SHS 1 to SHS 3, prepare for NSMQ, challenge classmates 1v1, and conquer exams.
           </p>
 
           {/* Core Action Buttons */}
           <div className="pt-3 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
             <button
-              onClick={() => handleAction('play')}
-              className="px-7 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-extrabold text-sm sm:text-base shadow-xl shadow-indigo-600/35 transition hover:scale-[1.02] flex items-center gap-2 cursor-pointer"
+              onClick={() => handleAction('practice')}
+              className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-extrabold text-sm sm:text-base shadow-xl shadow-indigo-600/35 transition hover:scale-[1.02] flex items-center gap-2 cursor-pointer"
             >
-              <Play className="w-4 h-4 fill-current" />
-              Play Now (Quick Battle)
+              <BookOpen className="w-4 h-4 fill-current" />
+              Practice Topics (SHS 1 - 3)
             </button>
 
             <button
-              onClick={() => handleAction('practice')}
-              className="px-6 py-3.5 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white font-bold text-sm sm:text-base border border-slate-700 transition flex items-center gap-2 cursor-pointer"
+              onClick={() => handleAction('nsmq')}
+              className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm sm:text-base shadow-xl shadow-amber-500/25 transition hover:scale-[1.02] flex items-center gap-2 cursor-pointer"
             >
-              <BookOpen className="w-4 h-4 text-emerald-400" />
-              Practice Arena
+              <Flame className="w-4 h-4 fill-current text-slate-950" />
+              NSMQ Practice Mode
             </button>
 
             <button
@@ -75,7 +78,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onOpenAuth }) =>
               className="px-6 py-3.5 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white font-bold text-sm sm:text-base border border-slate-700 transition flex items-center gap-2 cursor-pointer"
             >
               <Users className="w-4 h-4 text-purple-400" />
-              Challenge Friend
+              Challenge a Friend
             </button>
           </div>
 
@@ -84,14 +87,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onOpenAuth }) =>
               onClick={() => handleAction('leaderboard')}
               className="hover:text-indigo-300 flex items-center gap-1.5 transition"
             >
-              <Trophy className="w-3.5 h-3.5 text-amber-400" /> View Leaderboard
+              <Trophy className="w-3.5 h-3.5 text-amber-400" /> Leaderboard Rankings
             </button>
             <span>•</span>
             <button 
               onClick={onOpenAuth}
               className="hover:text-indigo-300 flex items-center gap-1.5 transition"
             >
-              <Shield className="w-3.5 h-3.5 text-indigo-400" /> Sign In / Account Moniker
+              <GraduationCap className="w-3.5 h-3.5 text-indigo-400" /> Student Sign In / Register
             </button>
           </div>
         </div>
@@ -101,21 +104,11 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onOpenAuth }) =>
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
         <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/30 transition group">
           <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-4 group-hover:scale-110 transition-transform">
-            <Zap className="w-6 h-6" />
+            <GraduationCap className="w-6 h-6" />
           </div>
-          <h3 className="text-lg font-bold text-white mb-2">Timed Rapid Fire</h3>
+          <h3 className="text-lg font-bold text-white mb-2">Subject → Topic Flow</h3>
           <p className="text-sm text-slate-400 leading-relaxed">
-            15-second countdown battles testing speed, razor-sharp accuracy, and curriculum recall under pressure.
-          </p>
-        </div>
-
-        <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-purple-500/30 transition group">
-          <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-4 group-hover:scale-110 transition-transform">
-            <BrainCircuit className="w-6 h-6" />
-          </div>
-          <h3 className="text-lg font-bold text-white mb-2">AI High School Explanations</h3>
-          <p className="text-sm text-slate-400 leading-relaxed">
-            Never stay confused. Tap "Explain With AI" to receive intuitive step-by-step concept coaching powered by Gemini.
+            Deliberately pick your subject, explore topics mapped strictly to your SHS 1, SHS 2, or SHS 3 level, choose question counts, and practice with step-by-step solutions.
           </p>
         </div>
 
@@ -123,50 +116,60 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onOpenAuth }) =>
           <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-4 group-hover:scale-110 transition-transform">
             <Flame className="w-6 h-6" />
           </div>
-          <h3 className="text-lg font-bold text-white mb-2">XP, Badges & Trophies</h3>
+          <h3 className="text-lg font-bold text-white mb-2">NSMQ Practice Arena</h3>
           <p className="text-sm text-slate-400 leading-relaxed">
-            Gain XP with every correct answer, unlock 10+ prestige badges, and climb the Global and Weekly rankings.
+            Original speed races, problem-solving, true/false statements, and riddles built specifically to prepare students for the academic rigor of Science and Maths competitions.
+          </p>
+        </div>
+
+        <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-purple-500/30 transition group">
+          <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-4 group-hover:scale-110 transition-transform">
+            <Users className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold text-white mb-2">1v1 Friend Challenge</h3>
+          <p className="text-sm text-slate-400 leading-relaxed">
+            Create custom room codes and challenge classmates in real-time synchronized multiplayer academic matches with live scoring and XP.
           </p>
         </div>
       </section>
 
-      {/* Categories Overview */}
+      {/* Curriculum Subject Arenas */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-white">Academic Arenas</h2>
-            <p className="text-xs sm:text-sm text-slate-400">Select any subject to jump straight into battle or practice</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-white">Ghana SHS Curriculum Arenas</h2>
+            <p className="text-xs sm:text-sm text-slate-400">Select any subject to choose specific curriculum topics and start practicing</p>
           </div>
           <button
-            onClick={() => handleAction('play')}
+            onClick={() => handleAction('practice')}
             className="text-xs sm:text-sm font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
           >
-            All Subjects <ArrowRight className="w-4 h-4" />
+            Explore All Subjects <ArrowRight className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {SUBJECTS.map((sub) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          {SHS_SUBJECTS.filter(s => s.isCoreScience).map((sub) => (
             <div
               key={sub.id}
-              onClick={() => handleAction('play', sub.id)}
+              onClick={() => handleAction('practice', sub.id)}
               className={`p-4 rounded-2xl bg-gradient-to-br ${sub.bgGradient} border backdrop-blur-sm hover:scale-[1.02] transition cursor-pointer flex flex-col justify-between`}
             >
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-bold uppercase tracking-wider ${sub.color}`}>
-                    80+ Benchmarks
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${sub.color}`}>
+                    SHS 1 • 2 • 3
                   </span>
                   <Target className={`w-4 h-4 ${sub.color}`} />
                 </div>
-                <h3 className="text-base font-bold text-white mb-1">{sub.name}</h3>
+                <h3 className="text-base font-extrabold text-white mb-1">{sub.name}</h3>
                 <p className="text-xs text-slate-300 line-clamp-2">{sub.description}</p>
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-700/40 flex items-center justify-between text-xs font-semibold text-slate-300">
-                <span>Easy • Med • Hard</span>
-                <span className="text-indigo-400 flex items-center gap-0.5">
-                  Play <ArrowRight className="w-3 h-3" />
+                <span>Curriculum Mapped</span>
+                <span className="text-indigo-300 flex items-center gap-0.5">
+                  Select <ArrowRight className="w-3 h-3" />
                 </span>
               </div>
             </div>
@@ -174,24 +177,28 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onOpenAuth }) =>
         </div>
       </section>
 
-      {/* Rules / Trust Banner */}
-      <section className="p-6 rounded-2xl bg-indigo-950/20 border border-indigo-500/20 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-300 shrink-0">
+      {/* Trust & Creator Credit Footer Card */}
+      <section className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-4 text-center sm:text-left">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center text-indigo-300 shrink-0">
             <CheckCircle2 className="w-6 h-6" />
           </div>
           <div>
             <h4 className="text-sm font-bold text-white">Curriculum Calibrated Content</h4>
-            <p className="text-xs text-slate-300">
-              Questions carefully crafted for secondary & senior high standards with zero duplicate queries.
+            <p className="text-xs text-slate-400">
+              Structured for Ghanaian Senior High School students preparing for WASSCE & NSMQ.
+            </p>
+            <p className="text-[11px] text-indigo-400 font-semibold pt-1">
+              Created & Developed by <span className="text-white font-bold">Avatar</span>
             </p>
           </div>
         </div>
+
         <button
           onClick={() => handleAction('dashboard')}
-          className="whitespace-nowrap px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition cursor-pointer"
+          className="whitespace-nowrap px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition cursor-pointer"
         >
-          View My Dashboard
+          Open Student Dashboard
         </button>
       </section>
     </div>

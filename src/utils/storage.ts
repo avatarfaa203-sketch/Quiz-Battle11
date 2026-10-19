@@ -43,8 +43,26 @@ export function calculateLevelFromXP(totalXp: number): {
   };
 }
 
+const TOKEN_KEY = 'quiz_battle_auth_token';
+
+export function getStoredAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setStoredAuthToken(token: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
 const DEFAULT_USER_STATS: UserStats = {
   username: 'ApexQuizzer',
+  avatar: 'avatar_1',
+  shsLevel: 'SHS 2',
   level: 1,
   xp: 120,
   gamesPlayed: 1,
@@ -52,14 +70,17 @@ const DEFAULT_USER_STATS: UserStats = {
   losses: 0,
   totalCorrect: 5,
   totalQuestions: 5,
-  currentStreak: 5,
-  bestStreak: 5,
+  currentStreak: 1,
+  bestStreak: 1,
+  lastPlayedDate: new Date().toISOString().split('T')[0],
+  multiplayerWins: 0,
+  multiplayerLosses: 0,
   unlockedBadgeIds: ['quiz-starter'],
   recentGames: [
     {
       id: 'init-1',
       date: new Date().toLocaleDateString(),
-      subject: 'Mathematics',
+      subject: 'Core Mathematics',
       difficulty: 'easy',
       score: 5,
       totalQuestions: 5,
@@ -83,14 +104,26 @@ export function loadUserStats(): UserStats {
     return {
       ...DEFAULT_USER_STATS,
       ...parsed,
+      shsLevel: parsed.shsLevel || 'SHS 2',
       xp,
       level,
+      multiplayerWins: typeof parsed.multiplayerWins === 'number' ? parsed.multiplayerWins : 0,
+      multiplayerLosses: typeof parsed.multiplayerLosses === 'number' ? parsed.multiplayerLosses : 0,
+      currentStreak: typeof parsed.currentStreak === 'number' ? parsed.currentStreak : 1,
+      bestStreak: typeof parsed.bestStreak === 'number' ? parsed.bestStreak : 1,
       unlockedBadgeIds: Array.isArray(parsed.unlockedBadgeIds) ? parsed.unlockedBadgeIds : ['quiz-starter'],
       recentGames: Array.isArray(parsed.recentGames) ? parsed.recentGames : DEFAULT_USER_STATS.recentGames,
     };
   } catch {
     return DEFAULT_USER_STATS;
   }
+}
+
+export function updateShsLevel(newLevel: 'SHS 1' | 'SHS 2' | 'SHS 3'): UserStats {
+  const stats = loadUserStats();
+  stats.shsLevel = newLevel;
+  saveUserStats(stats);
+  return stats;
 }
 
 export function saveUserStats(stats: UserStats): void {
@@ -158,17 +191,41 @@ export function recordQuizCompletion(params: {
 
   if (isWin) {
     stats.wins += 1;
+    if (params.mode === 'multiplayer') {
+      stats.multiplayerWins = (stats.multiplayerWins || 0) + 1;
+    }
   } else if (params.mode === 'battle' || params.mode === 'multiplayer') {
     stats.losses += 1;
+    if (params.mode === 'multiplayer') {
+      stats.multiplayerLosses = (stats.multiplayerLosses || 0) + 1;
+    }
   }
 
-  // Streaks
-  if (params.correctAnswers === params.totalQuestions) {
-    stats.currentStreak += params.correctAnswers;
+  // Calendar Day Daily Streak Logic:
+  // Completing at least one quiz in a calendar day counts toward the streak.
+  // Consecutive days increase the streak. Missing a day resets it.
+  // Multiple quizzes on the same day never artificially increment the streak.
+  const todayStr = new Date().toISOString().split('T')[0];
+  const lastDate = stats.lastPlayedDate;
+
+  if (!lastDate) {
+    stats.currentStreak = 1;
+  } else if (lastDate === todayStr) {
+    // Already played today, streak remains unchanged
   } else {
-    stats.currentStreak = params.correctAnswers;
+    const lastTime = new Date(lastDate + 'T00:00:00Z').getTime();
+    const todayTime = new Date(todayStr + 'T00:00:00Z').getTime();
+    const dayDiff = Math.round((todayTime - lastTime) / (1000 * 60 * 60 * 24));
+
+    if (dayDiff === 1) {
+      stats.currentStreak = (stats.currentStreak || 0) + 1;
+    } else {
+      stats.currentStreak = 1; // Missed a day
+    }
   }
-  if (stats.currentStreak > stats.bestStreak) {
+
+  stats.lastPlayedDate = todayStr;
+  if (stats.currentStreak > (stats.bestStreak || 0)) {
     stats.bestStreak = stats.currentStreak;
   }
 
@@ -205,10 +262,21 @@ export function recordQuizCompletion(params: {
   checkBadge('ten-wins', stats.wins >= 10);
   checkBadge('perfect-score', params.totalQuestions >= 5 && params.correctAnswers === params.totalQuestions);
   checkBadge('speed-demon', params.fastAnswersCount >= 1);
-  checkBadge('streak-master', stats.bestStreak >= 5);
+  checkBadge('streak-master', (stats.bestStreak || 0) >= 5);
 
   const newLevelData = calculateLevelFromXP(stats.xp);
   checkBadge('scholars-ascent', newLevelData.level >= 5);
+
+  // New achievements
+  checkBadge('ten-quizzes', stats.gamesPlayed >= 10);
+  checkBadge('hundred-questions', stats.totalQuestions >= 100);
+  checkBadge('ten-correct', stats.totalCorrect >= 10);
+  checkBadge('hundred-correct', stats.totalCorrect >= 100);
+  checkBadge('seven-day-streak', (stats.currentStreak || 0) >= 7 || (stats.bestStreak || 0) >= 7);
+  checkBadge('first-multiplayer-win', (stats.multiplayerWins || 0) >= 1);
+  checkBadge('ten-multiplayer-wins', (stats.multiplayerWins || 0) >= 10);
+  checkBadge('xp-1000', stats.xp >= 1000);
+  checkBadge('xp-5000', stats.xp >= 5000);
 
   // Subject specific
   if (params.subject === 'Mathematics' || params.subject === 'Additional Mathematics') {
@@ -228,6 +296,28 @@ export function recordQuizCompletion(params: {
   stats.unlockedBadgeIds = Array.from(currentUnlocked);
   stats.level = newLevelData.level;
   saveUserStats(stats);
+
+  // If user has active token, also sync to server in background
+  const token = getStoredAuthToken();
+  if (token) {
+    fetch('/api/quiz/record', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        subject: params.subject,
+        difficulty: params.difficulty,
+        correctAnswers: params.correctAnswers,
+        totalQuestions: params.totalQuestions,
+        fastAnswersCount: params.fastAnswersCount,
+        mode: params.mode,
+        isMultiplayerWin: params.isMultiplayerWin,
+        todayStr,
+      }),
+    }).catch(() => {});
+  }
 
   return {
     stats,
@@ -249,9 +339,24 @@ export function loadAllQuestions(): Question[] {
     }
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem(QUESTIONS_KEY, JSON.stringify(DEFAULT_QUESTIONS));
       return DEFAULT_QUESTIONS;
     }
-    return parsed;
+
+    // Merge any new default questions (e.g. curriculum, logarithms, NSMQ) into parsed
+    const existingIdSet = new Set(parsed.map((q: Question) => q.id));
+    let hasNew = false;
+    const merged = [...parsed];
+    for (const dq of DEFAULT_QUESTIONS) {
+      if (!existingIdSet.has(dq.id)) {
+        merged.unshift(dq);
+        hasNew = true;
+      }
+    }
+    if (hasNew) {
+      localStorage.setItem(QUESTIONS_KEY, JSON.stringify(merged));
+    }
+    return merged;
   } catch {
     return DEFAULT_QUESTIONS;
   }

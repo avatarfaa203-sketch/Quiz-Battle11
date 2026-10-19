@@ -7,15 +7,16 @@ import {
   Medal, 
   Flame, 
   Target, 
-  Zap, 
   Clock, 
   ArrowRight,
   Sparkles,
   TrendingUp,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Swords,
+  GraduationCap
 } from 'lucide-react';
-import { UserStats } from '../../types';
+import { UserStats, ShsLevel } from '../../types';
 import { calculateLevelFromXP } from '../../utils/storage';
 import { soundEffects } from '../../utils/audio';
 
@@ -35,6 +36,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     ? Math.round((userStats.totalCorrect / userStats.totalQuestions) * 100) 
     : 100;
 
+  const currentShsLevel: ShsLevel = userStats.shsLevel || 'SHS 2';
+
   // Approximate rank position based on XP
   const estimatedRank = Math.max(1, Math.min(250, 150 - Math.floor(userStats.xp / 100)));
 
@@ -45,7 +48,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-8 pb-16">
-      {/* User Overview Banner */}
+      {/* Student Overview Banner */}
       <div className="relative overflow-hidden rounded-3xl border border-indigo-500/30 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 p-6 sm:p-8 shadow-2xl">
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
@@ -63,19 +66,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
                   {userStats.username}
                 </h1>
+                <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center gap-1">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  {currentShsLevel}
+                </span>
                 <button
                   onClick={onOpenAuth}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold underline underline-offset-2 ml-1"
+                  className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold underline underline-offset-2 ml-1 cursor-pointer"
                 >
-                  Edit
+                  Edit Profile
                 </button>
               </div>
               <p className="text-sm font-semibold text-indigo-400 flex items-center gap-1.5 mt-0.5">
                 <Medal className="w-4 h-4 text-amber-400" />
-                {levelInfo.rankTitle}
+                {levelInfo.rankTitle} • Ghanaian Senior High Scholar
               </p>
               <p className="text-xs text-slate-400 mt-1">
-                Estimated Global Rank: <span className="text-white font-bold">#{estimatedRank}</span>
+                Estimated Ranking: <span className="text-white font-bold">#{estimatedRank}</span> • {userStats.unlockedBadgeIds?.length || 1} Badges Earned
               </p>
             </div>
           </div>
@@ -100,50 +107,54 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Main Buttons (Quick Battle, Challenge a Friend, Practice, Leaderboard) */}
+      {/* Main Feature Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Practice Topics */}
         <button
-          onClick={() => handleAction('play')}
+          onClick={() => handleAction('practice')}
           className="p-5 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white font-bold shadow-lg shadow-indigo-600/25 transition hover:scale-[1.02] flex items-center justify-between cursor-pointer"
         >
           <div className="text-left">
-            <span className="text-xs uppercase font-extrabold text-blue-200 block mb-1">Ranked Mode</span>
-            <div className="text-lg font-black">Quick Battle</div>
-            <div className="text-xs text-indigo-100 mt-1">15s Rapid timer • Max XP</div>
+            <span className="text-xs uppercase font-extrabold text-blue-200 block mb-1">Curriculum Flow</span>
+            <div className="text-lg font-black">Choose Topic & Quiz</div>
+            <div className="text-xs text-indigo-100 mt-1">Subject → Topic → Level ({currentShsLevel})</div>
           </div>
           <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-            <Play className="w-6 h-6 fill-current" />
+            <BookOpen className="w-6 h-6 fill-current" />
           </div>
         </button>
 
+        {/* Dedicated NSMQ Practice */}
+        <button
+          onClick={() => handleAction('nsmq')}
+          className="p-5 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold shadow-lg shadow-amber-500/25 transition hover:scale-[1.02] flex items-center justify-between cursor-pointer"
+        >
+          <div className="text-left">
+            <span className="text-xs uppercase font-extrabold text-amber-950 block mb-1">Competition Prep</span>
+            <div className="text-lg font-black">NSMQ Practice</div>
+            <div className="text-xs text-slate-900 font-semibold mt-1">Speed, Problems & Riddles</div>
+          </div>
+          <div className="w-12 h-12 rounded-xl bg-black/10 flex items-center justify-center text-slate-950">
+            <Flame className="w-6 h-6 fill-current" />
+          </div>
+        </button>
+
+        {/* 1v1 Challenge a Friend */}
         <button
           onClick={() => handleAction('multiplayer')}
           className="p-5 rounded-2xl bg-gradient-to-br from-purple-700 to-indigo-800 hover:from-purple-600 hover:to-indigo-700 text-white font-bold shadow-lg shadow-purple-600/25 transition hover:scale-[1.02] flex items-center justify-between cursor-pointer"
         >
           <div className="text-left">
-            <span className="text-xs uppercase font-extrabold text-purple-200 block mb-1">Room Battle</span>
+            <span className="text-xs uppercase font-extrabold text-purple-200 block mb-1">Live Multiplayer</span>
             <div className="text-lg font-black">Challenge Friend</div>
-            <div className="text-xs text-purple-100 mt-1">6-char room code lobby</div>
+            <div className="text-xs text-purple-100 mt-1">Synchronized 1v1 Room Battle</div>
           </div>
           <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
             <Users className="w-6 h-6" />
           </div>
         </button>
 
-        <button
-          onClick={() => handleAction('practice')}
-          className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-emerald-500/40 text-white font-bold transition hover:scale-[1.02] flex items-center justify-between cursor-pointer"
-        >
-          <div className="text-left">
-            <span className="text-xs uppercase font-extrabold text-emerald-400 block mb-1">Stress-Free</span>
-            <div className="text-lg font-black">Practice Arena</div>
-            <div className="text-xs text-slate-400 mt-1">Instant AI answers & deep dives</div>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-            <BookOpen className="w-6 h-6" />
-          </div>
-        </button>
-
+        {/* Leaderboard Standings */}
         <button
           onClick={() => handleAction('leaderboard')}
           className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-white font-bold transition hover:scale-[1.02] flex items-center justify-between cursor-pointer"
@@ -151,7 +162,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="text-left">
             <span className="text-xs uppercase font-extrabold text-amber-400 block mb-1">Rankings</span>
             <div className="text-lg font-black">Leaderboard</div>
-            <div className="text-xs text-slate-400 mt-1">Weekly & Global standings</div>
+            <div className="text-xs text-slate-400 mt-1">Track top student scholars</div>
           </div>
           <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
             <Trophy className="w-6 h-6" />
@@ -159,58 +170,80 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </button>
       </div>
 
-      {/* Core Stats Metric Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Games Played</span>
+      {/* Core Stats Metric Grid (Level, XP, Daily Streak, Quizzes Played, Accuracy, Multiplayer Wins) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-indigo-500/30 transition">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Level</span>
+            <Medal className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-black text-white">{levelInfo.level}</div>
+          <span className="text-[11px] text-indigo-400 font-semibold">{levelInfo.rankTitle}</span>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-amber-500/30 transition">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total XP</span>
+            <Sparkles className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-black text-amber-400">{userStats.xp.toLocaleString()}</div>
+          <span className="text-[11px] text-slate-400">Career XP points</span>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-orange-500/30 transition">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Daily Streak</span>
+            <Flame className="w-4 h-4 text-orange-400" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-black text-orange-400 flex items-center gap-1">
+            {userStats.currentStreak || 1} 🔥
+          </div>
+          <span className="text-[11px] text-slate-400">Best: {userStats.bestStreak || 1} days</span>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-blue-500/30 transition">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Quizzes</span>
             <Target className="w-4 h-4 text-blue-400" />
           </div>
           <div className="text-2xl sm:text-3xl font-black text-white">{userStats.gamesPlayed}</div>
-          <span className="text-[11px] text-slate-400">Total matches finished</span>
+          <span className="text-[11px] text-slate-400">{userStats.wins} Victories</span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Victories</span>
-            <Flame className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-emerald-400">{userStats.wins}</div>
-          <span className="text-[11px] text-slate-400">{userStats.losses} Defeats</span>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Accuracy</span>
+        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-purple-500/30 transition">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Accuracy</span>
             <TrendingUp className="w-4 h-4 text-purple-400" />
           </div>
           <div className="text-2xl sm:text-3xl font-black text-purple-300">{accuracy}%</div>
-          <span className="text-[11px] text-slate-400">{userStats.totalCorrect} of {userStats.totalQuestions} correct</span>
+          <span className="text-[11px] text-slate-400">{userStats.totalCorrect} / {userStats.totalQuestions} answers</span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Current Streak</span>
-            <Zap className="w-4 h-4 text-indigo-400" />
+        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/30 transition">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">1v1 Wins</span>
+            <Swords className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-indigo-300">{userStats.currentStreak} 🔥</div>
-          <span className="text-[11px] text-slate-400">Best streak: {userStats.bestStreak}</span>
+          <div className="text-2xl sm:text-3xl font-black text-emerald-400">
+            {userStats.multiplayerWins || 0}
+          </div>
+          <span className="text-[11px] text-slate-400">{userStats.multiplayerLosses || 0} Losses in duels</span>
         </div>
       </div>
 
-      {/* Recent Activity / Battle History */}
+      {/* Recent Activity / Quiz History */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <Clock className="w-4 h-4 text-indigo-400" />
-            Recent Battle History
+            Recent Quiz & Practice History
           </h2>
-          <span className="text-xs text-slate-400">Last 20 quizzes recorded</span>
+          <span className="text-xs text-slate-400">Synced to student account</span>
         </div>
 
         {userStats.recentGames.length === 0 ? (
           <div className="p-8 rounded-2xl bg-slate-900/40 border border-slate-800 text-center">
-            <p className="text-sm text-slate-400">No battle records yet. Jump into Quick Battle or Practice to begin!</p>
+            <p className="text-sm text-slate-400">No quiz records yet. Pick a topic to start practicing!</p>
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -251,6 +284,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             })}
           </div>
         )}
+      </div>
+
+      {/* Dashboard Footer with Creator Credit */}
+      <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 text-center text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <span>SHS Science Hub • Ghana High School Curriculum</span>
+        <span>Created & Developed by <strong className="text-indigo-400 font-semibold">Avatar</strong></span>
       </div>
     </div>
   );

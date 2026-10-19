@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  Swords, 
   Home, 
   Play, 
   BookOpen, 
@@ -12,11 +11,15 @@ import {
   Users,
   Menu,
   X,
-  ShieldAlert
+  ShieldAlert,
+  GraduationCap,
+  Atom,
+  Flame
 } from 'lucide-react';
-import { UserStats } from '../types';
+import { UserStats, ShsLevel } from '../types';
 import { calculateLevelFromXP } from '../utils/storage';
 import { soundEffects } from '../utils/audio';
+import { useAuth } from '../utils/AuthContext';
 
 interface NavbarProps {
   currentView: string;
@@ -33,10 +36,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuth,
   onOpenAdmin,
 }) => {
+  const { user, isAuthenticated } = useAuth();
   const [muted, setMuted] = useState(soundEffects.isMuted());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const levelInfo = calculateLevelFromXP(userStats.xp);
+  const activeShsLevel: ShsLevel = user?.shsLevel || userStats.shsLevel || 'SHS 2';
 
   const toggleSound = () => {
     const next = soundEffects.toggleMute();
@@ -46,9 +51,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   const navItems = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'dashboard', label: 'Dashboard', icon: Trophy },
-    { id: 'play', label: 'Play', icon: Play },
-    { id: 'practice', label: 'Practice', icon: BookOpen },
-    { id: 'multiplayer', label: 'Challenge', icon: Users },
+    { id: 'practice', label: 'Curriculum Quiz', icon: BookOpen },
+    { id: 'nsmq', label: 'NSMQ Practice', icon: Flame, badge: 'New' },
+    { id: 'multiplayer', label: '1v1 Challenge', icon: Users },
     { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
     { id: 'profile', label: 'Profile', icon: User },
   ];
@@ -68,20 +73,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => handleNavClick('home')}
             className="flex items-center gap-2.5 text-left group transition cursor-pointer"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 group-hover:scale-105 transition-transform">
-              <Swords className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 group-hover:scale-105 transition-transform text-white">
+              <Atom className="w-6 h-6 animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-lg sm:text-xl tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
-                  QUIZ BATTLE
+                <span className="font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
+                  SHS SCIENCE HUB
                 </span>
                 <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hidden sm:inline-block">
-                  PRO
+                  GHANA
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium hidden md:block">
-                Challenge. Answer. Conquer.
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium hidden md:block tracking-wide">
+                Learn • Practice • Challenge • Achieve
               </p>
             </div>
           </button>
@@ -95,14 +100,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   key={item.id}
                   onClick={() => handleNavClick(item.id)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition cursor-pointer relative ${
                     isActive
                       ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/40 shadow-sm'
                       : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
-                  {item.label}
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
+                  <span>{item.label}</span>
+                  {item.badge && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-black">
+                      {item.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -119,20 +129,25 @@ export const Navbar: React.FC<NavbarProps> = ({
               {muted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
             </button>
 
-            {/* User Level Pill */}
+            {/* Student Level & Account Pill */}
             <button
               onClick={onOpenAuth}
               className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 hover:border-indigo-500/50 transition cursor-pointer"
             >
               <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white shadow-inner">
-                {levelInfo.level}
+                {user?.avatar ? user.username.substring(0, 2).toUpperCase() : levelInfo.level}
               </div>
               <div className="text-left hidden sm:block">
-                <div className="text-xs font-bold text-slate-200 leading-tight truncate max-w-[100px]">
-                  {userStats.username}
+                <div className="text-xs font-bold text-slate-200 leading-tight truncate max-w-[110px] flex items-center gap-1">
+                  <span>{user ? user.username : userStats.username}</span>
+                  <span className="text-[10px] font-extrabold text-indigo-300 px-1.5 py-0.2 rounded bg-indigo-500/20 border border-indigo-500/30">
+                    {activeShsLevel}
+                  </span>
                 </div>
-                <div className="text-[10px] text-indigo-400 font-semibold leading-tight">
-                  {userStats.xp} XP
+                <div className="text-[10px] text-indigo-400 font-semibold leading-tight flex items-center gap-1">
+                  <span>Lvl {levelInfo.level}</span>
+                  <span>•</span>
+                  <span>{userStats.xp} XP</span>
                 </div>
               </div>
             </button>
@@ -150,10 +165,15 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
           <div className="lg:hidden border-t border-slate-800 bg-[#0b0f19] px-4 pt-3 pb-6 space-y-1.5 shadow-2xl">
-            <div className="py-2 px-3 mb-2 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+            <div className="py-2.5 px-3.5 mb-2 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
               <div>
-                <div className="text-xs text-slate-400">Player Profile</div>
-                <div className="font-bold text-sm text-slate-200">{userStats.username}</div>
+                <div className="text-xs text-slate-400">Student Profile</div>
+                <div className="font-extrabold text-sm text-slate-200 flex items-center gap-1.5">
+                  {userStats.username}
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    {activeShsLevel}
+                  </span>
+                </div>
               </div>
               <div className="text-right">
                 <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
@@ -170,14 +190,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   key={item.id}
                   onClick={() => handleNavClick(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold transition cursor-pointer ${
                     isActive
                       ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
                       : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
-                  {item.label}
+                  <div className="flex items-center gap-3">
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
+                    <span>{item.label}</span>
+                  </div>
+                  {item.badge && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                      {item.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -191,7 +218,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                Edit Account / Name
+                Account Settings ({activeShsLevel})
               </button>
               <button
                 onClick={() => {
@@ -212,49 +239,47 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0b0f19]/95 border-t border-slate-800/80 backdrop-blur-lg px-2 py-1.5 flex justify-around items-center">
         <button
           onClick={() => handleNavClick('home')}
-          className={`flex flex-col items-center py-1 px-2.5 rounded-lg text-[10px] font-semibold transition ${
+          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] font-semibold transition ${
             currentView === 'home' ? 'text-indigo-400' : 'text-slate-400'
           }`}
         >
-          <Home className="w-5 h-5 mb-0.5" />
+          <Home className="w-4 h-4 mb-0.5" />
           <span>Home</span>
         </button>
         <button
-          onClick={() => handleNavClick('play')}
-          className={`flex flex-col items-center py-1 px-2.5 rounded-lg text-[10px] font-semibold transition ${
-            currentView === 'play' ? 'text-indigo-400' : 'text-slate-400'
-          }`}
-        >
-          <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white -mt-2 shadow-lg shadow-indigo-500/40">
-            <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-          </div>
-          <span>Play</span>
-        </button>
-        <button
           onClick={() => handleNavClick('practice')}
-          className={`flex flex-col items-center py-1 px-2.5 rounded-lg text-[10px] font-semibold transition ${
+          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] font-semibold transition ${
             currentView === 'practice' ? 'text-indigo-400' : 'text-slate-400'
           }`}
         >
-          <BookOpen className="w-5 h-5 mb-0.5" />
-          <span>Practice</span>
+          <BookOpen className="w-4 h-4 mb-0.5" />
+          <span>Learn</span>
         </button>
         <button
-          onClick={() => handleNavClick('leaderboard')}
-          className={`flex flex-col items-center py-1 px-2.5 rounded-lg text-[10px] font-semibold transition ${
-            currentView === 'leaderboard' ? 'text-indigo-400' : 'text-slate-400'
+          onClick={() => handleNavClick('nsmq')}
+          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] font-semibold transition ${
+            currentView === 'nsmq' ? 'text-amber-400 font-bold' : 'text-slate-400'
           }`}
         >
-          <Trophy className="w-5 h-5 mb-0.5" />
-          <span>Rank</span>
+          <Flame className="w-4 h-4 mb-0.5 text-amber-400" />
+          <span>NSMQ</span>
+        </button>
+        <button
+          onClick={() => handleNavClick('multiplayer')}
+          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] font-semibold transition ${
+            currentView === 'multiplayer' ? 'text-indigo-400' : 'text-slate-400'
+          }`}
+        >
+          <Users className="w-4 h-4 mb-0.5" />
+          <span>1v1</span>
         </button>
         <button
           onClick={() => handleNavClick('profile')}
-          className={`flex flex-col items-center py-1 px-2.5 rounded-lg text-[10px] font-semibold transition ${
+          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] font-semibold transition ${
             currentView === 'profile' ? 'text-indigo-400' : 'text-slate-400'
           }`}
         >
-          <User className="w-5 h-5 mb-0.5" />
+          <User className="w-4 h-4 mb-0.5" />
           <span>Profile</span>
         </button>
       </div>

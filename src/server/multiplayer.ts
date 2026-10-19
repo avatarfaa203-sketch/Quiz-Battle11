@@ -44,6 +44,8 @@ interface SseClient {
 interface ServerRoom extends Omit<MultiplayerRoomState, 'players'> {
   players: PlayerState[];
   questions: Question[];
+  topic: string;
+  maxPlayers: number;
   currentReviewData?: ReviewData | null;
   currentFinalResults?: MultiplayerFinalResults | null;
   questionTimer?: NodeJS.Timeout | null;
@@ -99,9 +101,11 @@ export class MultiplayerManager {
       code: room.code,
       hostId: room.hostId,
       subject: room.subject,
+      topic: room.topic || 'All Topics',
       difficulty: room.difficulty,
       questionCount: room.questionCount,
       timePerQuestion: room.timePerQuestion,
+      maxPlayers: 4,
       status: room.status,
       createdAt: room.createdAt,
       currentQuestionIndex: room.currentQuestionIndex,
@@ -160,12 +164,34 @@ export class MultiplayerManager {
     }
   }
 
-  private selectQuestions(subject: Subject, difficulty: Difficulty, count: number): Question[] {
+  private selectQuestions(subject: Subject, difficulty: Difficulty, count: number, topic?: string): Question[] {
+    const shuffle = <T,>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
     const pool = DEFAULT_QUESTIONS.filter((q) => q.subject === subject);
+
+    if (topic && topic !== 'All Topics' && topic !== 'all') {
+      const normTopic = topic.toLowerCase().trim();
+      const topicMatches = pool.filter((q) => {
+        if (!q.topic) return false;
+        const qTopic = q.topic.toLowerCase().trim();
+        return qTopic === normTopic || qTopic.includes(normTopic) || normTopic.includes(qTopic);
+      });
+
+      if (topicMatches.length > 0) {
+        const exact = topicMatches.filter((q) => q.difficulty === difficulty);
+        const others = topicMatches.filter((q) => q.difficulty !== difficulty);
+        const combined = [...shuffle(exact), ...shuffle(others)];
+        if (combined.length >= count) {
+          return combined.slice(0, count);
+        }
+        const usedIds = new Set(combined.map((q) => q.id));
+        const remainingNeeded = count - combined.length;
+        const fallback = shuffle(pool.filter((q) => !usedIds.has(q.id))).slice(0, remainingNeeded);
+        return [...combined, ...fallback];
+      }
+    }
+
     const exact = pool.filter((q) => q.difficulty === difficulty);
     const others = pool.filter((q) => q.difficulty !== difficulty);
-
-    const shuffle = <T,>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
     const combined = [...shuffle(exact), ...shuffle(others)];
     let selected = combined.slice(0, Math.min(count, combined.length));
 
@@ -189,6 +215,7 @@ export class MultiplayerManager {
     difficulty: Difficulty,
     questionCount: number,
     timePerQuestion: number,
+    topic?: string,
     ws?: WebSocket | null
   ): { success: boolean; room: MultiplayerRoomState; code: string } {
     let code = this.generateCode();
@@ -210,15 +237,18 @@ export class MultiplayerManager {
       ws: ws || null,
     };
 
-    const questions = this.selectQuestions(subject, difficulty, questionCount);
+    const selectedTopic = topic?.trim() || 'All Topics';
+    const questions = this.selectQuestions(subject, difficulty, questionCount, selectedTopic);
 
     const room: ServerRoom = {
       code,
       hostId: playerId,
       subject,
+      topic: selectedTopic,
       difficulty,
       questionCount,
       timePerQuestion: [10, 15, 20, 30].includes(timePerQuestion) ? timePerQuestion : 15,
+      maxPlayers: 4,
       status: 'lobby',
       createdAt: Date.now(),
       players: [hostPlayer],
@@ -283,13 +313,13 @@ export class MultiplayerManager {
       return { success: false, message: 'Battle is already in progress or completed.' };
     }
 
-    if (room.players.length >= 2) {
-      return { success: false, message: 'Room is already full (1v1 maximum reached).' };
+    if (room.players.length >= 4) {
+      return { success: false, message: 'Room is already full (maximum 4 players reached).' };
     }
 
     const newPlayer: PlayerState = {
       id: playerId,
-      name: playerName.trim() || 'Challenger',
+      name: playerName.trim() || `Player ${room.players.length + 1}`,
       isHost: false,
       ready: false,
       score: 0,
@@ -360,12 +390,12 @@ export class MultiplayerManager {
     }
 
     if (room.players.length < 2) {
-      return { success: false, message: 'Waiting for an opponent to join.' };
+      return { success: false, message: 'Waiting for other players to join (minimum 2 players required).' };
     }
 
     const allReady = room.players.every((p) => p.ready);
     if (!allReady) {
-      return { success: false, message: 'Both players must be Ready before starting.' };
+      return { success: false, message: 'All players must be Ready before starting.' };
     }
 
     // Initialize game
@@ -584,20 +614,34 @@ export class MultiplayerManager {
   private finishGame(room: ServerRoom) {
     room.status = 'finished';
 
-    const [p1, p2] = room.players;
+    // Sort players by score descending, then correct answers, then name
+    const sorted = [...room.players].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.correctAnswers !== a.correctAnswers) return b.correctAnswers - a.correctAnswers;
+      return a.name.localeCompare(b.name);
+    });
+
     let winnerId: string | null = null;
     let isDraw = false;
 
-    if (p1 && p2) {
-      if (p1.score > p2.score) {
-        winnerId = p1.id;
-      } else if (p2.score > p1.score) {
-        winnerId = p2.id;
-      } else {
+    if (sorted.length > 0) {
+      if (sorted.length > 1 && sorted[0].score === sorted[1].score) {
         isDraw = true;
+        winnerId = null;
+      } else {
+        winnerId = sorted[0].id;
+        isDraw = false;
       }
-    } else if (p1) {
-      winnerId = p1.id;
+    }
+
+    // Assign placement ranks (1st, 2nd, 3rd, 4th) with tie support
+    const ranks = new Map<string, number>();
+    let currentRank = 1;
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i].score < sorted[i - 1].score) {
+        currentRank = i + 1;
+      }
+      ranks.set(sorted[i].id, currentRank);
     }
 
     room.winnerId = winnerId;
@@ -605,24 +649,28 @@ export class MultiplayerManager {
 
     room.xpAwarded = {};
     for (const player of room.players) {
+      const rank = ranks.get(player.id) || 1;
       let xp = 50; // base battle completion
-      if (player.id === winnerId) {
-        xp += 100; // winner bonus
-      } else if (isDraw) {
-        xp += 50; // draw bonus
+      if (rank === 1) {
+        xp += isDraw ? 70 : 100; // 1st place bonus
+      } else if (rank === 2) {
+        xp += 60; // 2nd place
+      } else if (rank === 3) {
+        xp += 40; // 3rd place
       } else {
-        xp += 20; // defeat bonus
+        xp += 25; // 4th place
       }
-      xp += player.correctAnswers * 15; // answer bonus
+      xp += player.correctAnswers * 15; // answer accuracy bonus
       room.xpAwarded[player.id] = xp;
     }
 
     const finalResults: MultiplayerFinalResults = {
       winnerId,
       isDraw,
-      finalScores: room.players.map((p) => ({
+      finalScores: sorted.map((p) => ({
         id: p.id,
         name: p.name,
+        rank: ranks.get(p.id) || 1,
         score: p.score,
         correctAnswers: p.correctAnswers,
         totalQuestions: room.questions.length,
@@ -656,13 +704,13 @@ export class MultiplayerManager {
 
     const player = room.players.find((p) => p.id === playerId);
 
-    if (room.rematchVotes.length >= 2) {
+    if (room.rematchVotes.length >= Math.min(2, room.players.length)) {
       room.status = 'lobby';
       room.currentQuestionIndex = 0;
       room.winnerId = null;
       room.isDraw = false;
       room.rematchVotes = [];
-      room.questions = this.selectQuestions(room.subject, room.difficulty, room.questionCount);
+      room.questions = this.selectQuestions(room.subject, room.difficulty, room.questionCount, room.topic);
       room.currentReviewData = null;
       room.currentFinalResults = null;
       room.announcement = 'Rematch accepted! Ready up in the lobby.';
@@ -687,7 +735,7 @@ export class MultiplayerManager {
       this.broadcast(room, {
         type: 'rematch_requested',
         requesterId: playerId,
-        requesterName: player?.name || 'Opponent',
+        requesterName: player?.name || 'Player',
         room: sanitized,
       });
       return { success: true, room: sanitized };
@@ -722,11 +770,26 @@ export class MultiplayerManager {
       });
     } else if (room.status === 'playing' || room.status === 'question_review') {
       player.connected = false;
-      const opponent = room.players.find((p) => p.id !== playerId);
-      if (opponent) {
-        room.winnerId = opponent.id;
+      const activeRemaining = room.players.filter((p) => p.connected);
+      if (activeRemaining.length <= 1) {
+        if (activeRemaining.length === 1) {
+          room.winnerId = activeRemaining[0].id;
+        }
+        this.finishGame(room);
+      } else {
+        const sanitized = this.sanitizeRoomState(room);
+        this.broadcast(room, {
+          type: 'room_updated',
+          room: sanitized,
+          announcement: `${player.name} left the battle.`,
+        });
+        const allAnswered = activeRemaining.every((p) => Boolean(p.currentAnswer));
+        if (allAnswered && room.status === 'playing') {
+          if (room.questionTimer) clearTimeout(room.questionTimer);
+          const currentQ = room.questions[room.currentQuestionIndex];
+          this.completeQuestion(room, currentQ);
+        }
       }
-      this.finishGame(room);
     }
 
     return { success: true };

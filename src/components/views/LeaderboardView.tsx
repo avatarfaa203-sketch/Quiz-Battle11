@@ -4,6 +4,8 @@ import { LeaderboardEntry, UserStats } from '../../types';
 import { calculateLevelFromXP } from '../../utils/storage';
 import { soundEffects } from '../../utils/audio';
 
+import { getStoredAuthToken } from '../../utils/storage';
+
 interface LeaderboardViewProps {
   userStats: UserStats;
 }
@@ -12,6 +14,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ userStats }) =
   const [tab, setTab] = useState<'global' | 'weekly'>('global');
   const [globalList, setGlobalList] = useState<LeaderboardEntry[]>([]);
   const [weeklyList, setWeeklyList] = useState<LeaderboardEntry[]>([]);
+  const [serverUserRank, setServerUserRank] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   const levelInfo = calculateLevelFromXP(userStats.xp);
@@ -22,11 +25,18 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ userStats }) =
   useEffect(() => {
     const fetchLeaderboards = async () => {
       try {
-        const res = await fetch('/api/leaderboards');
+        const token = getStoredAuthToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/leaderboards', { headers });
         if (res.ok) {
           const data = await res.json();
           setGlobalList(data.global || []);
           setWeeklyList(data.weekly || []);
+          if (typeof data.currentUserRank === 'number') {
+            setServerUserRank(data.currentUserRank);
+          }
         }
       } catch {
         // Fallback gracefully if network is offline
@@ -35,15 +45,17 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ userStats }) =
       }
     };
     fetchLeaderboards();
-  }, []);
+  }, [userStats.xp, userStats.wins]);
 
   const currentList = tab === 'global' ? globalList : weeklyList;
 
-  // Compute where the user fits in the leaderboard
-  let userRank = 1;
-  for (const entry of currentList) {
-    if (userStats.xp < entry.xp) {
-      userRank = entry.rank + 1;
+  // Compute where the user fits in the leaderboard if server didn't specify
+  let userRank = serverUserRank || 1;
+  if (!serverUserRank) {
+    for (const entry of currentList) {
+      if (userStats.xp < entry.xp) {
+        userRank = entry.rank + 1;
+      }
     }
   }
 
@@ -166,22 +178,33 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ userStats }) =
               );
             }
 
+            const isCurrentUserRow = entry.isCurrentUser || entry.username === userStats.username;
+
             return (
               <div
                 key={entry.rank}
                 className={`grid grid-cols-12 px-5 py-3.5 items-center transition ${
-                  isTop3 ? 'bg-indigo-950/10' : 'hover:bg-slate-800/40'
+                  isCurrentUserRow
+                    ? 'bg-indigo-600/20 border-y border-indigo-500/40'
+                    : isTop3
+                    ? 'bg-indigo-950/10'
+                    : 'hover:bg-slate-800/40'
                 }`}
               >
                 <div className="col-span-2 sm:col-span-1 text-center">{rankBadge}</div>
 
                 <div className="col-span-6 sm:col-span-5 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-white shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-purple-600 border border-slate-700 flex items-center justify-center font-bold text-xs text-white shrink-0">
                     {entry.username.substring(0, 2).toUpperCase()}
                   </div>
                   <div className="truncate">
                     <div className="font-bold text-white text-sm truncate flex items-center gap-1.5">
                       {entry.username}
+                      {isCurrentUserRow && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-500/30 text-indigo-300 border border-indigo-500/40">
+                          You
+                        </span>
+                      )}
                       {entry.rank === 1 && (
                         <Flame className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                       )}
@@ -207,6 +230,12 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ userStats }) =
             );
           })}
         </div>
+      </div>
+
+      {/* Creator Credit & Branding */}
+      <div className="pt-4 text-center text-xs text-slate-400">
+        <p className="text-indigo-300 font-semibold mb-0.5">SHS Science Hub • Learn • Practice • Challenge • Achieve</p>
+        <p>Created & Developed by <strong className="text-indigo-400 font-bold">Avatar</strong></p>
       </div>
     </div>
   );

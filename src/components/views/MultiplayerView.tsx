@@ -25,8 +25,9 @@ import {
   MultiplayerFinalResults 
 } from '../../types';
 import { SUBJECTS } from '../../data/defaultQuestions';
+import { getCurriculumTopics } from '../../data/curriculum';
 import { soundEffects } from '../../utils/audio';
-import { recordQuizCompletion } from '../../utils/storage';
+import { recordQuizCompletion, getStoredAuthToken } from '../../utils/storage';
 
 interface MultiplayerViewProps {
   userStats: UserStats;
@@ -53,7 +54,8 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
 
   // Setup options
   const [tab, setTab] = useState<'create' | 'join'>('create');
-  const [subject, setSubject] = useState<Subject>('Mathematics');
+  const [subject, setSubject] = useState<Subject>('Core Mathematics');
+  const [topic, setTopic] = useState<string>('All Topics (Mixed)');
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [questionCount, setQuestionCount] = useState<number>(5);
   const [timePerQuestion, setTimePerQuestion] = useState<number>(15);
@@ -139,6 +141,28 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
               isMultiplayerWin: isWinner,
             });
             onStatsUpdated(completion.stats);
+
+            // Synchronize multiplayer win/loss to server account
+            const token = getStoredAuthToken();
+            if (token) {
+              fetch('/api/multiplayer/record', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  roomCode: serverRoom.code,
+                  isWinner,
+                  isDraw: serverRoom.isDraw,
+                  correctAnswers: myStats.correctAnswers,
+                  totalQuestions: myStats.totalQuestions,
+                  xpEarned: myStats.xpEarned,
+                  subject: serverRoom.subject,
+                  difficulty: serverRoom.difficulty,
+                }),
+              }).catch(() => {});
+            }
           }
 
           if (serverRoom.winnerId === playerId) {
@@ -250,6 +274,7 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
           hostName: userStats.username,
           playerId,
           subject,
+          topic: topic === 'All Topics (Mixed)' ? 'All Topics' : topic,
           difficulty,
           questionCount,
           timePerQuestion,
@@ -429,60 +454,107 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
 
   // ================= PHASE 4: FINAL RESULTS =================
   if (finalResults && room) {
+    const sortedScores = [...finalResults.finalScores].sort((a, b) => (a.rank || 1) - (b.rank || 1));
+    const myStats = sortedScores.find((p) => p.id === playerId);
+    const myRank = myStats?.rank || 1;
     const isWinner = finalResults.winnerId === playerId;
-    const isLoser = !finalResults.isDraw && !isWinner;
-    const myStats = finalResults.finalScores.find((p) => p.id === playerId);
-    const opponentStats = finalResults.finalScores.find((p) => p.id !== playerId);
+    const isTiedFirst = finalResults.isDraw && myRank === 1;
+
+    const rankTitles: Record<number, string> = {
+      1: isTiedFirst ? 'Tied for 1st Place!' : isWinner ? '1st Place Champion!' : '1st Place!',
+      2: '2nd Place Runner-Up!',
+      3: '3rd Place Podium!',
+      4: '4th Place Finisher!',
+    };
+
+    const rankColors: Record<number, { border: string; bg: string; badge: string; text: string; medal: string }> = {
+      1: { border: 'border-amber-500/60 shadow-amber-500/10', bg: 'bg-amber-950/30', badge: 'bg-amber-500 text-slate-950 font-black', text: 'text-amber-400', medal: '🥇 1st Place' },
+      2: { border: 'border-slate-400/60 shadow-slate-400/10', bg: 'bg-slate-800/40', badge: 'bg-slate-300 text-slate-950 font-black', text: 'text-slate-200', medal: '🥈 2nd Place' },
+      3: { border: 'border-amber-700/60 shadow-amber-700/10', bg: 'bg-amber-950/20', badge: 'bg-amber-700 text-white font-black', text: 'text-amber-500', medal: '🥉 3rd Place' },
+      4: { border: 'border-slate-700 shadow-slate-700/10', bg: 'bg-slate-900/40', badge: 'bg-slate-700 text-slate-300 font-black', text: 'text-slate-400', medal: '🎖️ 4th Place' },
+    };
 
     return (
       <div className="max-w-2xl mx-auto space-y-6 pb-20">
         <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 border border-indigo-500/30 text-center shadow-2xl space-y-6">
           <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-xl shadow-indigo-500/30">
-            {isWinner ? <Trophy className="w-10 h-10 text-amber-300" /> : <Swords className="w-10 h-10 text-white" />}
+            {myRank === 1 ? <Trophy className="w-10 h-10 text-amber-300" /> : <Swords className="w-10 h-10 text-white" />}
           </div>
 
           <div>
-            <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-              1v1 Battle Completed • {room.subject}
-            </span>
-            <h1 className="text-3xl sm:text-4xl font-black text-white mt-2">
-              {isWinner ? 'You Won!' : isLoser ? 'You Lost' : "It's a Draw!"}
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
+              <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                Battle Completed • {room.subject}
+              </span>
+              {room.topic && room.topic !== 'All Topics' && room.topic !== 'All Topics (Mixed)' && (
+                <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  {room.topic}
+                </span>
+              )}
+            </div>
+
+            <h1 className="text-3xl sm:text-4xl font-black text-white mt-1">
+              {rankTitles[myRank] || 'Battle Completed!'}
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              {isWinner
-                ? 'Superior precision and velocity claimed the battle.'
-                : isLoser
-                ? 'A valiant effort. Regroup and challenge again.'
-                : 'Evenly matched gladiators.'}
+              {myRank === 1
+                ? 'Mastery, speed, and precision secured the victory!'
+                : myRank === 2
+                ? 'Strong performance! A very close academic contest.'
+                : 'Great battle! Review the questions and challenge your peers again.'}
             </p>
           </div>
 
-          {/* Player Comparison Card */}
-          <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-950/70 border border-slate-800">
-            <div className={`p-4 rounded-xl border text-center ${isWinner ? 'bg-indigo-950/40 border-indigo-500/50' : 'bg-slate-900 border-slate-800'}`}>
-              <span className="text-xs text-slate-400 font-bold block mb-1">
-                {myStats?.name || userStats.username} (You)
-              </span>
-              <div className="text-3xl font-black text-white">{myStats?.score || 0} pts</div>
-              <div className="text-xs text-emerald-400 font-semibold mt-1">
-                {myStats?.correctAnswers || 0} / {totalQuestions} Correct ({myStats?.accuracy || 0}%)
-              </div>
-              <div className="text-xs text-amber-400 font-bold mt-2">
-                +{myStats?.xpEarned || 50} XP Earned
-              </div>
+          {/* Final Standings (Occupied Positions: 1st, 2nd, 3rd, 4th) */}
+          <div className="space-y-2.5 text-left">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
+              Final Standings ({sortedScores.length} Players)
             </div>
 
-            <div className={`p-4 rounded-xl border text-center ${finalResults.winnerId === opponentStats?.id ? 'bg-purple-950/40 border-purple-500/50' : 'bg-slate-900 border-slate-800'}`}>
-              <span className="text-xs text-slate-400 font-bold block mb-1">
-                {opponentStats?.name || 'Opponent'}
-              </span>
-              <div className="text-3xl font-black text-white">{opponentStats?.score || 0} pts</div>
-              <div className="text-xs text-slate-300 font-semibold mt-1">
-                {opponentStats?.correctAnswers || 0} / {totalQuestions} Correct ({opponentStats?.accuracy || 0}%)
-              </div>
-              <div className="text-xs text-slate-400 font-bold mt-2">
-                +{opponentStats?.xpEarned || 50} XP
-              </div>
+            <div className="space-y-2.5">
+              {sortedScores.map((scoreItem, idx) => {
+                const rank = scoreItem.rank || (idx + 1);
+                const isMe = scoreItem.id === playerId;
+                const styling = rankColors[rank] || rankColors[4];
+
+                return (
+                  <div
+                    key={scoreItem.id}
+                    className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg ${styling.bg} ${styling.border} ${
+                      isMe ? 'ring-2 ring-indigo-500/70' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm shrink-0 shadow ${styling.badge}`}>
+                        #{rank}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-white text-base truncate">{scoreItem.name}</span>
+                          {isMe && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-500/40">
+                              You
+                            </span>
+                          )}
+                          <span className={`text-[11px] font-bold ${styling.text}`}>
+                            {styling.medal}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400 font-semibold mt-0.5">
+                          {scoreItem.correctAnswers} / {scoreItem.totalQuestions} Correct ({scoreItem.accuracy}%)
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-800/80">
+                      <div className="text-left sm:text-right">
+                        <div className="text-2xl font-black text-white">{scoreItem.score} pts</div>
+                        <div className="text-xs font-bold text-amber-400">+{scoreItem.xpEarned} XP</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -522,45 +594,82 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
   // ================= PHASE 3: REAL-TIME BATTLE ARENA =================
   if (room && (room.status === 'playing' || room.status === 'question_review') && currentQuestion) {
     const me = room.players.find((p) => p.id === playerId);
-    const opponent = room.players.find((p) => p.id !== playerId);
+    const playerColors = [
+      { avatar: 'bg-blue-600', ring: 'ring-blue-500/50', border: 'border-blue-500/30' },
+      { avatar: 'bg-purple-600', ring: 'ring-purple-500/50', border: 'border-purple-500/30' },
+      { avatar: 'bg-emerald-600', ring: 'ring-emerald-500/50', border: 'border-emerald-500/30' },
+      { avatar: 'bg-amber-600', ring: 'ring-amber-500/50', border: 'border-amber-500/30' },
+    ];
 
     return (
       <div className="max-w-3xl mx-auto space-y-6 pb-20">
-        {/* Battle Live Header (Scoreboard) */}
-        <div className="p-4 sm:p-5 rounded-3xl bg-slate-900 border border-indigo-500/30 shadow-2xl flex items-center justify-between">
-          {/* Current Player */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-extrabold text-white text-sm">
-              {(me?.name || userStats.username).substring(0, 2).toUpperCase()}
-            </div>
+        {/* Battle Live Header (Scoreboard for 2 to 4 Players) */}
+        <div className="p-4 sm:p-5 rounded-3xl bg-slate-900 border border-indigo-500/30 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div>
-              <div className="text-xs text-slate-400 font-semibold">{me?.name || userStats.username} (You)</div>
-              <div className="font-extrabold text-white text-base">{me?.score || 0} pts</div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-400 block">
+                {room.subject} {room.topic && room.topic !== 'All Topics' && room.topic !== 'All Topics (Mixed)' ? `• ${room.topic}` : ''}
+              </span>
+              <span className="text-xs text-slate-400 font-semibold capitalize">
+                {room.difficulty} • {room.players.length} Contenders Arena
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <div className="text-[11px] font-bold text-slate-400">
+                  Question {questionIndex + 1} of {totalQuestions}
+                </div>
+              </div>
+              <div className={`px-3 py-1.5 rounded-xl font-mono font-bold text-sm border inline-flex items-center gap-1.5 shadow-md ${
+                timeLeft <= 4 ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse' : 'bg-slate-800 text-indigo-300 border-slate-700'
+              }`}>
+                <Timer className="w-4 h-4" />
+                <span>{timeLeft}s</span>
+              </div>
             </div>
           </div>
 
-          {/* Center: Timer & Question Counter */}
-          <div className="text-center">
-            <div className={`px-3 py-1 rounded-full font-mono font-bold text-sm border inline-flex items-center gap-1 ${
-              timeLeft <= 4 ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse' : 'bg-slate-800 text-indigo-300 border-slate-700'
-            }`}>
-              <Timer className="w-4 h-4" />
-              <span>{timeLeft}s</span>
-            </div>
-            <div className="text-[11px] font-bold text-slate-400 mt-1">
-              Q{questionIndex + 1} of {totalQuestions}
-            </div>
-          </div>
+          {/* Player Cards (2, 3, or 4 Players) */}
+          <div className={`grid gap-2.5 ${
+            room.players.length === 2 ? 'grid-cols-2' : room.players.length === 3 ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4'
+          }`}>
+            {room.players.map((p, idx) => {
+              const isMe = p.id === playerId;
+              const hasAnswered = Boolean(p.currentAnswer);
+              const color = playerColors[idx % playerColors.length];
 
-          {/* Opponent Player */}
-          <div className="flex items-center gap-3 text-right">
-            <div>
-              <div className="text-xs text-slate-400 font-semibold">{opponent?.name || 'Opponent'}</div>
-              <div className="font-extrabold text-white text-base">{opponent?.score || 0} pts</div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center font-extrabold text-white text-sm">
-              {(opponent?.name || 'OP').substring(0, 2).toUpperCase()}
-            </div>
+              return (
+                <div
+                  key={p.id}
+                  className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center gap-2.5 ${
+                    isMe
+                      ? 'bg-indigo-950/40 border-indigo-500/60 ring-1 ring-indigo-500/40'
+                      : 'bg-slate-950/60 border-slate-800/80'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-xl ${color.avatar} flex items-center justify-center font-extrabold text-white text-xs shrink-0 shadow`}>
+                    {p.name.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-bold text-white truncate">{p.name}</span>
+                      {p.isHost && <Crown className="w-3 h-3 text-amber-400 shrink-0" />}
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] mt-0.5">
+                      <span className="font-extrabold text-indigo-300">{p.score} pts</span>
+                      {hasAnswered ? (
+                        <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-0.5">
+                          <CheckCircle2 className="w-2.5 h-2.5" /> Locked
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-500 font-medium">Thinking</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -624,25 +733,36 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
             })}
           </div>
 
-          {/* Question Review Snippet when both players finish */}
+          {/* Question Review Snippet when all players finish */}
           {room.status === 'question_review' && reviewData && (
-            <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 text-xs space-y-2 animate-in fade-in">
+            <div className="p-4 sm:p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 text-xs space-y-3 animate-in fade-in">
               <div className="flex items-center justify-between font-bold text-indigo-300">
-                <span>Correct Option: {reviewData.correctAnswer}</span>
+                <span>Correct Option: <strong className="text-emerald-400">{reviewData.correctAnswer}</strong></span>
                 <span className="text-slate-400">Next question starting soon...</span>
               </div>
-              <p className="text-slate-300 leading-relaxed">
+              <p className="text-slate-300 leading-relaxed bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
                 {reviewData.explanation}
               </p>
+              {/* Player results roster */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                {reviewData.playerResults.map((pr) => (
+                  <div key={pr.id} className="p-2 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                    <span className="font-semibold text-slate-300 truncate text-[11px]">{pr.name}</span>
+                    <span className={`font-bold text-[11px] ${pr.isCorrect ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {pr.choice} {pr.isCorrect ? `(+${pr.scoreEarned})` : '(+0)'}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Waiting for opponent indicator */}
+          {/* Waiting for other players indicator */}
           {isAnswerLocked && room.status === 'playing' && (
             <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between text-xs text-slate-300">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                Answer locked in. Waiting for opponent or timer...
+                Answer locked in. Waiting for other players or timer...
               </span>
               <span className="font-mono text-indigo-400">{timeLeft}s left</span>
             </div>
@@ -655,9 +775,17 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
   // ================= PHASE 2: GAME LOBBY =================
   if (room && room.status === 'lobby') {
     const isHost = room.hostId === playerId;
-    const opponent = room.players.find((p) => p.id !== playerId);
     const myPlayer = room.players.find((p) => p.id === playerId);
-    const allReady = room.players.length === 2 && room.players.every((p) => p.ready);
+    const isRoomFull = room.players.length >= 4;
+    const canStart = room.players.length >= 2 && room.players.every((p) => p.ready);
+    const readyCount = room.players.filter((p) => p.ready).length;
+
+    const playerColors = [
+      { border: 'border-blue-500/40', bg: 'bg-blue-950/30', avatar: 'bg-blue-600', text: 'text-blue-400' },
+      { border: 'border-purple-500/40', bg: 'bg-purple-950/30', avatar: 'bg-purple-600', text: 'text-purple-400' },
+      { border: 'border-emerald-500/40', bg: 'bg-emerald-950/30', avatar: 'bg-emerald-600', text: 'text-emerald-400' },
+      { border: 'border-amber-500/40', bg: 'bg-amber-950/30', avatar: 'bg-amber-600', text: 'text-amber-400' },
+    ];
 
     return (
       <div className="max-w-2xl mx-auto space-y-6 pb-20">
@@ -668,19 +796,26 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
         )}
 
         <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 border border-indigo-500/30 shadow-2xl text-center space-y-6">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-blue-600 flex items-center justify-center text-white shadow-lg">
             <Users className="w-8 h-8" />
           </div>
 
           <div>
-            <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-              Multiplayer 1v1 Battle Lobby
-            </span>
-            <h1 className="text-2xl sm:text-3xl font-black text-white mt-2">
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
+              <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                Multiplayer Lobby (2 – 4 Players)
+              </span>
+              {isRoomFull && (
+                <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
+                  Room Full (4/4 Players)
+                </span>
+              )}
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-white mt-1">
               Room Code: <span className="font-mono text-indigo-400 tracking-wider">{room.code}</span>
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              Give this 6-character code to your friend to join.
+              Share this 6-character code with up to 3 friends to battle together.
             </p>
           </div>
 
@@ -696,54 +831,98 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
           </div>
 
           {/* Match Settings Card */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-semibold text-slate-300">
-            <div>Subject: <strong className="text-white block">{room.subject}</strong></div>
-            <div>Difficulty: <strong className="text-white block capitalize">{room.difficulty}</strong></div>
-            <div>Questions: <strong className="text-white block">{room.questionCount}</strong></div>
-            <div>Timer: <strong className="text-white block">{room.timePerQuestion}s/question</strong></div>
+          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-semibold text-slate-300 text-left">
+            <div>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Subject</span>
+              <strong className="text-white block truncate">{room.subject}</strong>
+            </div>
+            <div>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Topic</span>
+              <strong className="text-indigo-300 block truncate">{room.topic || 'All Topics'}</strong>
+            </div>
+            <div>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Difficulty & Length</span>
+              <strong className="text-white block capitalize">{room.difficulty} • {room.questionCount} Qs</strong>
+            </div>
+            <div>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Timer & Capacity</span>
+              <strong className="text-white block">{room.timePerQuestion}s • {room.players.length}/4 Players</strong>
+            </div>
           </div>
 
-          {/* Player Roster Grid */}
+          {/* Player Roster Grid (4 Slots: Player 1, Player 2, Player 3, Player 4) */}
           <div className="space-y-3 text-left">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Contenders ({room.players.length} / 2)
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Host Card */}
-              {room.players.filter((p) => p.isHost).map((p) => (
-                <div key={p.id} className="p-4 rounded-2xl bg-slate-800/90 border border-indigo-500/30 flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Crown className="w-4 h-4 text-amber-400" />
-                      <span className="font-bold text-white text-sm">{p.name}</span>
-                      {p.id === playerId && <span className="text-[10px] text-indigo-400">(You)</span>}
-                    </div>
-                    <span className={`text-xs font-bold mt-1 inline-block ${p.ready ? 'text-emerald-400' : 'text-slate-400'}`}>
-                      {p.ready ? '✓ Ready' : '• Not Ready'}
-                    </span>
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Contenders ({room.players.length} / 4 Players)
+              </h3>
+              <span className="text-xs text-slate-400 font-semibold">
+                {readyCount} of {room.players.length} Ready
+              </span>
+            </div>
 
-              {/* Opponent Card */}
-              {opponent ? (
-                <div className="p-4 rounded-2xl bg-slate-800/90 border border-purple-500/30 flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Swords className="w-4 h-4 text-purple-400" />
-                      <span className="font-bold text-white text-sm">{opponent.name}</span>
-                      {opponent.id === playerId && <span className="text-[10px] text-indigo-400">(You)</span>}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[0, 1, 2, 3].map((slotIdx) => {
+                const player = room.players[slotIdx];
+                const color = playerColors[slotIdx % playerColors.length];
+                const slotLabel = `Player ${slotIdx + 1}${slotIdx === 0 ? ' (Host)' : ''}`;
+
+                if (player) {
+                  return (
+                    <div
+                      key={player.id}
+                      className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between ${color.bg} ${color.border} ${
+                        player.id === playerId ? 'ring-2 ring-indigo-500/50' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-9 h-9 rounded-xl ${color.avatar} flex items-center justify-center font-black text-white text-xs shrink-0 shadow`}>
+                          {player.name.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            {player.isHost && <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                            <span className="font-bold text-white text-sm truncate">{player.name}</span>
+                            {player.id === playerId && <span className="text-[10px] text-indigo-400 font-bold shrink-0">(You)</span>}
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-medium block">
+                            {slotLabel}
+                          </span>
+                        </div>
+                      </div>
+
+                      <span className={`text-xs font-bold px-2 py-1 rounded-lg shrink-0 ${
+                        player.ready
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-slate-800 text-slate-400 border border-slate-700'
+                      }`}>
+                        {player.ready ? '✓ Ready' : '• Not Ready'}
+                      </span>
                     </div>
-                    <span className={`text-xs font-bold mt-1 inline-block ${opponent.ready ? 'text-emerald-400' : 'text-slate-400'}`}>
-                      {opponent.ready ? '✓ Ready' : '• Not Ready'}
-                    </span>
+                  );
+                }
+
+                // Empty Slot
+                return (
+                  <div
+                    key={`empty_slot_${slotIdx}`}
+                    className="p-3.5 rounded-2xl bg-slate-950/40 border border-dashed border-slate-800 flex items-center justify-between text-xs text-slate-500"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-slate-800/60 border border-slate-700 flex items-center justify-center font-bold text-slate-500 text-xs">
+                        P{slotIdx + 1}
+                      </div>
+                      <div>
+                        <span className="font-semibold block text-slate-400">{slotLabel}</span>
+                        <span className="text-[11px] text-slate-500">
+                          {slotIdx === 1 ? 'Waiting for opponent...' : 'Open slot (Optional)'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Empty</span>
                   </div>
-                </div>
-              ) : (
-                <div className="p-4 rounded-2xl bg-slate-900/60 border border-dashed border-slate-700 flex items-center justify-center text-xs text-slate-400 text-center">
-                  <span className="animate-pulse">Waiting for opponent to enter code...</span>
-                </div>
-              )}
+                );
+              })}
             </div>
           </div>
 
@@ -760,7 +939,7 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
               onClick={handleToggleReady}
               className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer ${
                 myPlayer?.ready
-                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20'
                   : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
               }`}
             >
@@ -769,12 +948,16 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
 
             {isHost && (
               <button
-                disabled={!allReady}
+                disabled={!canStart}
                 onClick={handleStartGame}
                 className="w-full sm:flex-1 py-3 px-6 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-extrabold text-sm shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Play className="w-4 h-4 fill-current" />
-                {allReady ? 'Start Battle Now' : 'Waiting for Ready...'}
+                {room.players.length < 2
+                  ? 'Waiting for Players (Min 2)...'
+                  : !canStart
+                  ? `Waiting for Ready (${readyCount}/${room.players.length})`
+                  : `Start Battle Now (${room.players.length} Players)`}
               </button>
             )}
           </div>
@@ -784,15 +967,17 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
   }
 
   // ================= PHASE 1: CREATE / JOIN SELECTION =================
+  const availableTopics = ['All Topics (Mixed)', ...getCurriculumTopics(subject)];
+
   return (
     <div className="max-w-xl mx-auto space-y-6 pb-20">
       <div className="text-center space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold uppercase tracking-wider">
-          <Wifi className="w-3.5 h-3.5" /> Battle Server Online
+          <Wifi className="w-3.5 h-3.5" /> Battle Server Online • 2–4 Players
         </div>
-        <h1 className="text-3xl font-black text-white">Challenge A Friend</h1>
+        <h1 className="text-3xl font-black text-white">Challenge Friends</h1>
         <p className="text-sm text-slate-400">
-          Compete head-to-head in synchronized real-time academic battles.
+          Compete in synchronized real-time academic battles (2 to 4 players).
         </p>
       </div>
 
@@ -837,13 +1022,18 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
 
       {tab === 'create' ? (
         <form onSubmit={handleCreateRoom} className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
+          {/* Subject Selection */}
           <div>
             <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
-              Select Subject
+              1. Choose Subject
             </label>
             <select
               value={subject}
-              onChange={(e) => setSubject(e.target.value as Subject)}
+              onChange={(e) => {
+                const newSub = e.target.value as Subject;
+                setSubject(newSub);
+                setTopic('All Topics (Mixed)');
+              }}
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white font-medium text-sm outline-none focus:border-indigo-500"
             >
               {SUBJECTS.map((s) => (
@@ -854,10 +1044,31 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
             </select>
           </div>
 
+          {/* Topic Selection */}
+          <div>
+            <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
+              2. Choose Topic
+            </label>
+            <select
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white font-medium text-sm outline-none focus:border-indigo-500"
+            >
+              {availableTopics.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Select a curriculum topic (e.g. Logarithms, Kinematics, Organic Chemistry) or all topics.
+            </p>
+          </div>
+
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
-                Difficulty
+                3. Difficulty
               </label>
               <select
                 value={difficulty}
@@ -872,7 +1083,7 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
 
             <div>
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
-                Questions
+                4. Questions
               </label>
               <select
                 value={questionCount}
@@ -881,13 +1092,14 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
               >
                 <option value={5}>5 Questions</option>
                 <option value={10}>10 Questions</option>
+                <option value={15}>15 Questions</option>
                 <option value={20}>20 Questions</option>
               </select>
             </div>
 
             <div>
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
-                Time Limit
+                5. Timer
               </label>
               <select
                 value={timePerQuestion}
@@ -907,7 +1119,7 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
             disabled={loading}
             className="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-extrabold text-sm shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            {loading ? 'Creating Room...' : 'Create Room & Get 6-Char Code'}
+            {loading ? 'Creating Room...' : 'Create Room (2–4 Players) & Get Code'}
           </button>
         </form>
       ) : (
@@ -951,13 +1163,16 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
         </form>
       )}
 
-      <div className="text-center">
+      <div className="text-center space-y-2">
         <button
           onClick={onCancel}
           className="text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer"
         >
           Back to Dashboard
         </button>
+        <p className="text-[11px] text-slate-500">
+          SHS Science Hub • Created & Developed by <strong className="text-indigo-400 font-semibold">Avatar</strong>
+        </p>
       </div>
     </div>
   );

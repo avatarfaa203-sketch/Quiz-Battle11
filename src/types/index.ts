@@ -1,14 +1,19 @@
+export type ShsLevel = 'SHS 1' | 'SHS 2' | 'SHS 3';
+
 export type Subject =
-  | 'Mathematics'
+  | 'Core Mathematics'
   | 'Additional Mathematics'
   | 'Physics'
   | 'Chemistry'
   | 'Biology'
+  | 'Mathematics' // Legacy compatibility
   | 'English'
   | 'Computing'
   | 'General Knowledge';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
+
+export type NsmqRound = 'general' | 'speed' | 'problem' | 'true_false' | 'riddle';
 
 export interface Question {
   id: string;
@@ -21,10 +26,20 @@ export interface Question {
   optionD: string;
   correctAnswer: 'A' | 'B' | 'C' | 'D';
   explanation: string;
+  shsLevel?: ShsLevel;
+  topic?: string;
+  subtopic?: string;
+  isNsmq?: boolean;
+  nsmqRound?: NsmqRound;
+  clues?: string[]; // Specifically for Round 5 riddles
 }
 
 export interface UserStats {
+  id?: string;
   username: string;
+  email?: string;
+  avatar?: string;
+  shsLevel?: ShsLevel;
   level: number;
   xp: number;
   gamesPlayed: number;
@@ -34,8 +49,28 @@ export interface UserStats {
   totalQuestions: number;
   currentStreak: number;
   bestStreak: number;
+  lastPlayedDate?: string; // YYYY-MM-DD
+  multiplayerWins: number;
+  multiplayerLosses: number;
   unlockedBadgeIds: string[];
   recentGames: GameHistoryItem[];
+}
+
+export interface UserProfile {
+  id: string;
+  username: string;
+  email: string;
+  avatar: string;
+  shsLevel?: ShsLevel;
+  createdAt: string;
+  stats: UserStats;
+}
+
+export interface AuthState {
+  user: UserProfile | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 export interface GameHistoryItem {
@@ -120,6 +155,7 @@ export interface MultiplayerFinalResults {
     totalQuestions: number;
     accuracy: number;
     xpEarned: number;
+    rank?: number;
   }>;
 }
 
@@ -127,9 +163,11 @@ export interface MultiplayerRoomState {
   code: string;
   hostId: string;
   subject: Subject;
+  topic?: string;
   difficulty: Difficulty;
   questionCount: number;
   timePerQuestion: number;
+  maxPlayers: number;
   status: 'lobby' | 'playing' | 'question_review' | 'finished';
   createdAt: number;
   players: MultiplayerPlayer[];
