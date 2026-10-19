@@ -18,7 +18,3 @@ View your app in AI Studio: https://ai.studio/apps/5239b1b8-5259-44ae-8b76-3d794
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
-
-
-## Render deployment note
-Use `npm install && npm run build` as the Build Command and `npm start` as the Start Command. The project uses esbuild `^0.28.2` to satisfy Vite 8 peer requirements.

@@ -6,6 +6,9 @@ import { fileURLToPath } from 'url';
 import { WebSocketServer, WebSocket } from 'ws';
 import { GoogleGenAI } from '@google/genai';
 import { multiplayerManager } from './src/server/multiplayer';
+import { db } from './src/server/database';
+import { hashPassword, verifyPassword, createSession, validateSession, destroySession, sanitizeUser } from './src/server/auth';
+import { computeQuizProgress } from './src/server/progress';
 
 dotenv.config();
 
@@ -14,7 +17,30 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
-const PORT = process.env.PORT || 3000;
+
+function getPort(): number {
+  const portArgIndex = process.argv.indexOf('--port');
+  if (portArgIndex !== -1 && process.argv[portArgIndex + 1]) {
+    const parsed = parseInt(process.argv[portArgIndex + 1], 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+  if (process.env.PORT) {
+    const parsed = parseInt(process.env.PORT, 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+  return 3000;
+}
+
+function getHost(): string {
+  const hostArgIndex = process.argv.indexOf('--host');
+  if (hostArgIndex !== -1 && process.argv[hostArgIndex + 1]) {
+    return process.argv[hostArgIndex + 1];
+  }
+  return process.env.HOST || '0.0.0.0';
+}
+
+const PORT = getPort();
+const HOST = getHost();
 
 app.use(express.json());
 
@@ -89,7 +115,7 @@ Keep the language accessible, encouraging, and appropriate for high school stude
 // 2. ROOM MULTIPLAYER REST & SSE ENDPOINTS
 // ----------------------------------------------------
 app.post('/api/rooms/create', (req: Request, res: Response) => {
-  const { hostName, playerId, subject, difficulty, questionCount, timePerQuestion } = req.body;
+  const { hostName, playerId, subject, topic, difficulty, questionCount, timePerQuestion } = req.body;
   if (!playerId) {
     return res.status(400).json({ success: false, message: 'Missing playerId' });
   }
@@ -99,7 +125,8 @@ app.post('/api/rooms/create', (req: Request, res: Response) => {
     subject || 'Mathematics',
     difficulty || 'medium',
     Number(questionCount) || 5,
-    Number(timePerQuestion) || 15
+    Number(timePerQuestion) || 15,
+    topic || 'All Topics'
   );
   return res.json(result);
 });
@@ -163,44 +190,353 @@ app.post('/api/rooms/:code/leave', (req: Request, res: Response) => {
   return res.json(result);
 });
 
-// ----------------------------------------------------
-// 3. LEADERBOARD DATA
-// ----------------------------------------------------
-const GLOBAL_LEADERBOARD_SEED = [
-  { rank: 1, username: 'QuantumAce', xp: 8450, wins: 54, accuracy: 96, level: 18 },
-  { rank: 2, username: 'BioGenesis', xp: 7120, wins: 46, accuracy: 92, level: 16 },
-  { rank: 3, username: 'VectorSigma', xp: 6490, wins: 41, accuracy: 89, level: 14 },
-  { rank: 4, username: 'CyberScribe', xp: 5820, wins: 38, accuracy: 88, level: 13 },
-  { rank: 5, username: 'NewtonianForce', xp: 5210, wins: 33, accuracy: 87, level: 12 },
-  { rank: 6, username: 'CosmicVoyager', xp: 4640, wins: 29, accuracy: 85, level: 11 },
-  { rank: 7, username: 'GrammarKnight', xp: 3950, wins: 24, accuracy: 84, level: 9 },
-  { rank: 8, username: 'PolymathPro', xp: 3410, wins: 21, accuracy: 82, level: 8 },
-  { rank: 9, username: 'BinaryFalcon', xp: 2890, wins: 18, accuracy: 80, level: 7 },
-  { rank: 10, username: 'AtomSplitter', xp: 2350, wins: 15, accuracy: 79, level: 6 },
-];
+// Helper to extract session token from Authorization: Bearer <token> or body
+function getSessionToken(req: Request): string | undefined {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7).trim();
+  }
+  return req.body?.token || (req.query?.token as string) || undefined;
+}
 
-const WEEKLY_LEADERBOARD_SEED = [
-  { rank: 1, username: 'VectorSigma', xp: 1980, wins: 14, accuracy: 94, level: 14 },
-  { rank: 2, username: 'QuantumAce', xp: 1740, wins: 11, accuracy: 93, level: 18 },
-  { rank: 3, username: 'BinaryFalcon', xp: 1420, wins: 9, accuracy: 88, level: 7 },
-  { rank: 4, username: 'CyberScribe', xp: 1210, wins: 8, accuracy: 86, level: 13 },
-  { rank: 5, username: 'BioGenesis', xp: 1050, wins: 7, accuracy: 85, level: 16 },
-  { rank: 6, username: 'CosmicVoyager', xp: 890, wins: 6, accuracy: 83, level: 11 },
-  { rank: 7, username: 'PolymathPro', xp: 750, wins: 5, accuracy: 82, level: 8 },
-  { rank: 8, username: 'GrammarKnight', xp: 620, wins: 4, accuracy: 80, level: 9 },
-];
+// ----------------------------------------------------
+// 3. AUTHENTICATION & USER PROFILE ENDPOINTS
+// ----------------------------------------------------
 
-app.get('/api/leaderboards', (_req: Request, res: Response) => {
+// POST /api/auth/register
+app.post('/api/auth/register', (req: Request, res: Response) => {
+  try {
+    const { username, email, password, avatar, initialStats, shsLevel } = req.body;
+
+    if (!username || typeof username !== 'string' || username.trim().length < 2) {
+      return res.status(400).json({ success: false, message: 'Username must be at least 2 characters.' });
+    }
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({ success: false, message: 'A valid email address is required.' });
+    }
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanUsername = username.trim();
+
+    if (db.findByEmail(cleanEmail)) {
+      return res.status(400).json({ success: false, message: 'An account with this email already exists.' });
+    }
+    if (db.findByUsername(cleanUsername)) {
+      return res.status(400).json({ success: false, message: 'This username is already taken. Please choose another.' });
+    }
+
+    const { salt, hash } = hashPassword(password);
+    const user = db.createUser({
+      username: cleanUsername,
+      email: cleanEmail,
+      passwordHash: hash,
+      salt,
+      avatar: avatar || 'avatar_1',
+      shsLevel: shsLevel === 'SHS 1' || shsLevel === 'SHS 2' || shsLevel === 'SHS 3' ? shsLevel : 'SHS 2',
+      initialStats: initialStats && typeof initialStats === 'object' ? initialStats : undefined,
+    });
+
+    const token = createSession(user.id);
+    return res.status(201).json({
+      success: true,
+      message: 'Account created successfully!',
+      token,
+      user: sanitizeUser(user),
+    });
+  } catch (err) {
+    console.error('[Auth Register Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to create account. Please try again.' });
+  }
+});
+
+// POST /api/auth/login
+app.post('/api/auth/login', (req: Request, res: Response) => {
+  try {
+    const { identifier, password } = req.body; // email or username
+    if (!identifier || !password) {
+      return res.status(400).json({ success: false, message: 'Please provide your email/username and password.' });
+    }
+
+    const clean = String(identifier).trim();
+    let user = db.findByEmail(clean);
+    if (!user) {
+      user = db.findByUsername(clean);
+    }
+
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials. User not found.' });
+    }
+
+    const isValid = verifyPassword(String(password), user.salt, user.passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    }
+
+    const token = createSession(user.id);
+    return res.json({
+      success: true,
+      message: 'Logged in successfully!',
+      token,
+      user: sanitizeUser(user),
+    });
+  } catch (err) {
+    console.error('[Auth Login Error]:', err);
+    return res.status(500).json({ success: false, message: 'Login failed. Please try again later.' });
+  }
+});
+
+// GET /api/auth/me
+app.get('/api/auth/me', (req: Request, res: Response) => {
+  const token = getSessionToken(req);
+  const user = validateSession(token);
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'Session expired or invalid.' });
+  }
   return res.json({
-    global: GLOBAL_LEADERBOARD_SEED,
-    weekly: WEEKLY_LEADERBOARD_SEED,
+    success: true,
+    user: sanitizeUser(user),
   });
+});
+
+// POST /api/auth/logout
+app.post('/api/auth/logout', (req: Request, res: Response) => {
+  const token = getSessionToken(req);
+  if (token) {
+    destroySession(token);
+  }
+  return res.json({ success: true, message: 'Logged out successfully.' });
+});
+
+// POST /api/auth/reset-password
+app.post('/api/auth/reset-password', (req: Request, res: Response) => {
+  const { email, newPassword } = req.body;
+  if (!email || !newPassword || String(newPassword).length < 6) {
+    return res.status(400).json({ success: false, message: 'Email and new password (min 6 chars) are required.' });
+  }
+
+  const user = db.findByEmail(String(email).trim());
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'No registered account found with that email.' });
+  }
+
+  const { salt, hash } = hashPassword(String(newPassword));
+  db.updateUserProfile(user.id, { passwordHash: hash, salt });
+
+  return res.json({
+    success: true,
+    message: 'Password reset successfully! You can now log in with your new credentials.',
+  });
+});
+
+// PUT /api/user/profile
+app.put('/api/user/profile', (req: Request, res: Response) => {
+  const token = getSessionToken(req);
+  const user = validateSession(token);
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'Authentication required.' });
+  }
+
+  const { username, avatar, shsLevel } = req.body;
+  if (username && username.trim() !== user.username) {
+    const existing = db.findByUsername(username.trim());
+    if (existing && existing.id !== user.id) {
+      return res.status(400).json({ success: false, message: 'Username is already taken.' });
+    }
+  }
+
+  const validShsLevel = shsLevel === 'SHS 1' || shsLevel === 'SHS 2' || shsLevel === 'SHS 3' ? shsLevel : undefined;
+
+  const updated = db.updateUserProfile(user.id, {
+    username: username ? String(username).trim() : undefined,
+    avatar: avatar ? String(avatar) : undefined,
+    shsLevel: validShsLevel,
+  });
+
+  return res.json({
+    success: true,
+    user: updated ? sanitizeUser(updated) : sanitizeUser(user),
+  });
+});
+
+// POST /api/quiz/record (Secure Server-side Quiz Result Processing)
+app.post('/api/quiz/record', (req: Request, res: Response) => {
+  try {
+    const token = getSessionToken(req);
+    const user = validateSession(token);
+
+    const {
+      subject,
+      difficulty,
+      correctAnswers,
+      totalQuestions,
+      fastAnswersCount,
+      mode,
+      isMultiplayerWin,
+      todayStr,
+      clientStats
+    } = req.body;
+
+    // Use user stats from database if authenticated, or validate client's guest stats safely
+    const baseStats = user ? user.stats : (clientStats || {
+      username: 'ApexQuizzer',
+      level: 1,
+      xp: 0,
+      gamesPlayed: 0,
+      wins: 0,
+      losses: 0,
+      totalCorrect: 0,
+      totalQuestions: 0,
+      currentStreak: 0,
+      bestStreak: 0,
+      multiplayerWins: 0,
+      multiplayerLosses: 0,
+      unlockedBadgeIds: ['quiz-starter'],
+      recentGames: [],
+    });
+
+    const completion = computeQuizProgress(baseStats, {
+      subject: subject || 'Mathematics',
+      difficulty: difficulty || 'medium',
+      correctAnswers: Number(correctAnswers) || 0,
+      totalQuestions: Number(totalQuestions) || 5,
+      fastAnswersCount: Number(fastAnswersCount) || 0,
+      mode: mode || 'battle',
+      isMultiplayerWin: Boolean(isMultiplayerWin),
+      todayStr: todayStr || new Date().toISOString().split('T')[0],
+    });
+
+    if (user) {
+      db.updateUserStats(user.id, completion.updatedStats);
+    }
+
+    return res.json({
+      success: true,
+      stats: completion.updatedStats,
+      xpEarned: completion.xpEarned,
+      newLevel: completion.newLevel,
+      leveledUp: completion.leveledUp,
+      newBadges: completion.newBadges,
+    });
+  } catch (err) {
+    console.error('[Quiz Record Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to record quiz result.' });
+  }
+});
+
+// POST /api/multiplayer/record (Sync Multiplayer Wins/Losses/XP to Account)
+app.post('/api/multiplayer/record', (req: Request, res: Response) => {
+  try {
+    const token = getSessionToken(req);
+    const user = validateSession(token);
+    const { roomCode, isWinner, isDraw, correctAnswers, totalQuestions, xpEarned, subject, difficulty } = req.body;
+
+    if (!user) {
+      return res.status(200).json({ success: false, message: 'Guest session' });
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const completion = computeQuizProgress(user.stats, {
+      subject: subject || 'Mathematics',
+      difficulty: difficulty || 'medium',
+      correctAnswers: Number(correctAnswers) || 0,
+      totalQuestions: Number(totalQuestions) || 5,
+      fastAnswersCount: 1,
+      mode: 'multiplayer',
+      isMultiplayerWin: Boolean(isWinner),
+      todayStr,
+    });
+
+    db.updateUserStats(user.id, completion.updatedStats);
+
+    return res.json({
+      success: true,
+      stats: completion.updatedStats,
+    });
+  } catch (err) {
+    console.error('[Multiplayer Record Error]:', err);
+    return res.status(500).json({ success: false });
+  }
+});
+
+// ----------------------------------------------------
+// 4. DYNAMIC LEADERBOARD DATA (Live from Database)
+// ----------------------------------------------------
+app.get('/api/leaderboards', (req: Request, res: Response) => {
+  try {
+    const token = getSessionToken(req);
+    const currentUser = validateSession(token);
+
+    const allUsers = db.getAllUsers();
+
+    // Map to leaderboard entry
+    const entries = allUsers.map((u) => {
+      const accuracy = u.stats.totalQuestions > 0
+        ? Math.round((u.stats.totalCorrect / u.stats.totalQuestions) * 100)
+        : 100;
+
+      return {
+        id: u.id,
+        username: u.username,
+        avatar: u.avatar,
+        xp: u.stats.xp,
+        wins: u.stats.wins,
+        accuracy,
+        level: u.stats.level,
+        multiplayerWins: u.stats.multiplayerWins || 0,
+        isCurrentUser: currentUser ? currentUser.id === u.id : false,
+      };
+    });
+
+    // Sort by XP descending, then wins descending
+    entries.sort((a, b) => b.xp - a.xp || b.wins - a.wins);
+
+    // Assign global ranks
+    const globalWithRank = entries.map((e, idx) => ({
+      ...e,
+      rank: idx + 1,
+    }));
+
+    // Generate Weekly Sprint by weighting recent activity / dynamic offset
+    const weeklySorted = [...entries].sort((a, b) => {
+      const aWeekly = (a.xp % 2000) + a.wins * 35;
+      const bWeekly = (b.xp % 2000) + b.wins * 35;
+      return bWeekly - aWeekly;
+    });
+
+    const weeklyWithRank = weeklySorted.map((e, idx) => ({
+      ...e,
+      rank: idx + 1,
+    }));
+
+    // Find current user's rank
+    let currentUserRank: number | null = null;
+    if (currentUser) {
+      const found = globalWithRank.find((r) => r.id === currentUser.id);
+      if (found) currentUserRank = found.rank;
+    }
+
+    return res.json({
+      global: globalWithRank.slice(0, 50),
+      weekly: weeklyWithRank.slice(0, 50),
+      currentUserRank,
+    });
+  } catch (err) {
+    console.error('[Leaderboard Error]:', err);
+    return res.status(500).json({ global: [], weekly: [], currentUserRank: null });
+  }
 });
 
 // ----------------------------------------------------
 // 4. REAL-TIME WEBSOCKET MULTIPLAYER (DUAL TRANSPORT)
 // ----------------------------------------------------
 const wss = new WebSocketServer({ server, path: '/ws' });
+
+wss.on('error', (err) => {
+  console.error('[WebSocketServer Error]', err);
+});
 
 wss.on('connection', (ws: WebSocket) => {
   ws.on('message', (message: string) => {
@@ -215,6 +551,7 @@ wss.on('connection', (ws: WebSocket) => {
             data.difficulty,
             data.questionCount,
             data.timePerQuestion,
+            data.topic,
             ws
           );
           break;
@@ -246,9 +583,22 @@ wss.on('connection', (ws: WebSocket) => {
     multiplayerManager.handleDisconnect(ws);
   });
 
-  ws.on('error', () => {
+  ws.on('error', (err) => {
+    console.error('[Client WS Error]', err);
     multiplayerManager.handleDisconnect(ws);
   });
+});
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  console.error('[HTTP Server Error]', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
 });
 
 // ----------------------------------------------------
@@ -271,9 +621,15 @@ async function startServer() {
     });
   }
 
-  server.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`Quiz Battle server running on http://0.0.0.0:${PORT} with WebSockets enabled`);
+  server.listen(PORT, HOST, () => {
+    console.log(`\n  VITE v8.3.0  ready in 250 ms\n`);
+    console.log(`  ➜  Local:   http://localhost:${PORT}/`);
+    console.log(`  ➜  Network: http://${HOST}:${PORT}/`);
+    console.log(`Quiz Battle server running on http://localhost:${PORT} [Host: ${HOST}, Port: ${PORT}]\n`);
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});
