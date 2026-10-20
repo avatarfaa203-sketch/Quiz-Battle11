@@ -39,6 +39,7 @@ export interface UserStats {
   username: string;
   email?: string;
   avatar?: string;
+  schoolName?: string;
   shsLevel?: ShsLevel;
   level: number;
   xp: number;
@@ -61,6 +62,7 @@ export interface UserProfile {
   username: string;
   email: string;
   avatar: string;
+  schoolName?: string;
   shsLevel?: ShsLevel;
   createdAt: string;
   stats: UserStats;
@@ -96,11 +98,30 @@ export interface Badge {
 export interface LeaderboardEntry {
   rank: number;
   username: string;
+  avatar?: string;
+  schoolName?: string;
   xp: number;
   wins: number;
   accuracy: number;
   level: number;
   isCurrentUser?: boolean;
+}
+
+export interface SchoolLeaderboardEntry {
+  rank: number;
+  schoolName: string;
+  totalXp: number;
+  studentCount: number;
+  isCurrentSchool?: boolean;
+}
+
+export interface StudentSchoolStats {
+  schoolName: string;
+  schoolRank: number;
+  totalSchoolXp: number;
+  studentCount: number;
+  userContributionXp: number;
+  contributionPercent: number;
 }
 
 export interface MultiplayerPlayer {

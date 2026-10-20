@@ -56,15 +56,18 @@ export function destroySession(token: string): boolean {
 }
 
 export function sanitizeUser(record: ServerUserRecord): UserProfile {
+  const school = record.schoolName || record.stats.schoolName || '';
   return {
     id: record.id,
     username: record.username,
     email: record.email,
     avatar: record.avatar,
+    schoolName: school,
     shsLevel: record.shsLevel || record.stats.shsLevel || 'SHS 2',
     createdAt: record.createdAt,
     stats: {
       ...record.stats,
+      schoolName: school,
       shsLevel: record.shsLevel || record.stats.shsLevel || 'SHS 2',
     },
   };

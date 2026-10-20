@@ -59,6 +59,78 @@ export function setStoredAuthToken(token: string | null): void {
   }
 }
 
+const GUEST_FLAG_KEY = 'shs_hub_is_guest';
+const GUEST_STATS_KEY = 'shs_hub_guest_stats';
+
+export const INITIAL_GUEST_STATS: UserStats = {
+  username: 'Guest Scholar',
+  avatar: 'avatar_1',
+  schoolName: 'Guest Mode (Unregistered)',
+  shsLevel: 'SHS 2',
+  level: 1,
+  xp: 0,
+  gamesPlayed: 0,
+  wins: 0,
+  losses: 0,
+  totalCorrect: 0,
+  totalQuestions: 0,
+  currentStreak: 0,
+  bestStreak: 0,
+  multiplayerWins: 0,
+  multiplayerLosses: 0,
+  unlockedBadgeIds: [],
+  recentGames: [],
+};
+
+export function isGuestModeActive(): boolean {
+  if (typeof window === 'undefined') return false;
+  return sessionStorage.getItem(GUEST_FLAG_KEY) === 'true';
+}
+
+export function setGuestModeActive(active: boolean): void {
+  if (typeof window === 'undefined') return;
+  if (active) {
+    sessionStorage.setItem(GUEST_FLAG_KEY, 'true');
+    if (!sessionStorage.getItem(GUEST_STATS_KEY)) {
+      sessionStorage.setItem(GUEST_STATS_KEY, JSON.stringify(INITIAL_GUEST_STATS));
+    }
+  } else {
+    sessionStorage.removeItem(GUEST_FLAG_KEY);
+    sessionStorage.removeItem(GUEST_STATS_KEY);
+  }
+}
+
+export function loadGuestStats(): UserStats {
+  if (typeof window === 'undefined') return INITIAL_GUEST_STATS;
+  try {
+    const raw = sessionStorage.getItem(GUEST_STATS_KEY);
+    if (!raw) {
+      sessionStorage.setItem(GUEST_STATS_KEY, JSON.stringify(INITIAL_GUEST_STATS));
+      return { ...INITIAL_GUEST_STATS };
+    }
+    const parsed = JSON.parse(raw);
+    const xp = typeof parsed.xp === 'number' ? parsed.xp : 0;
+    const { level } = calculateLevelFromXP(xp);
+    return {
+      ...INITIAL_GUEST_STATS,
+      ...parsed,
+      xp,
+      level,
+    };
+  } catch {
+    return { ...INITIAL_GUEST_STATS };
+  }
+}
+
+export function saveGuestStats(stats: UserStats): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const { level } = calculateLevelFromXP(stats.xp);
+    stats.level = level;
+    sessionStorage.setItem(GUEST_STATS_KEY, JSON.stringify(stats));
+  } catch {}
+}
+
 const DEFAULT_USER_STATS: UserStats = {
   username: 'ApexQuizzer',
   avatar: 'avatar_1',
@@ -92,6 +164,9 @@ const DEFAULT_USER_STATS: UserStats = {
 
 export function loadUserStats(): UserStats {
   if (typeof window === 'undefined') return DEFAULT_USER_STATS;
+  if (isGuestModeActive()) {
+    return loadGuestStats();
+  }
   try {
     const raw = localStorage.getItem(STATS_KEY);
     if (!raw) {
@@ -128,6 +203,10 @@ export function updateShsLevel(newLevel: 'SHS 1' | 'SHS 2' | 'SHS 3'): UserStats
 
 export function saveUserStats(stats: UserStats): void {
   if (typeof window === 'undefined') return;
+  if (isGuestModeActive()) {
+    saveGuestStats(stats);
+    return;
+  }
   try {
     const { level } = calculateLevelFromXP(stats.xp);
     stats.level = level;
@@ -140,6 +219,13 @@ export function saveUserStats(stats: UserStats): void {
 export function updateUsername(newUsername: string): UserStats {
   const stats = loadUserStats();
   stats.username = newUsername.trim() || 'Player';
+  saveUserStats(stats);
+  return stats;
+}
+
+export function updateSchoolName(newSchoolName: string): UserStats {
+  const stats = loadUserStats();
+  stats.schoolName = newSchoolName.trim();
   saveUserStats(stats);
   return stats;
 }

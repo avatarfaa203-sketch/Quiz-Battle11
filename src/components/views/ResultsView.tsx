@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Difficulty, Question, Subject } from '../../types';
 import { soundEffects } from '../../utils/audio';
+import { VoiceNarrator } from '../VoiceNarrator';
 
 interface ResultsViewProps {
   result: {
@@ -231,9 +232,12 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                     </span>
                   </div>
 
-                  <div className="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-800 mt-2">
-                    <strong className="text-indigo-400 block mb-0.5 font-semibold">Explanation:</strong>
-                    {q.explanation}
+                  <div className="text-xs text-slate-300 bg-slate-900/60 p-3.5 rounded-xl border border-slate-800 mt-2 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
+                      <strong className="text-indigo-400 font-semibold">Explanation:</strong>
+                      <VoiceNarrator text={q.explanation} label="Listen" compact />
+                    </div>
+                    <p className="pt-0.5">{q.explanation}</p>
                   </div>
                 </div>
               );

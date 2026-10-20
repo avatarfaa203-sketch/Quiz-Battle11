@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Sparkles, BookOpen, Brain, CheckCircle, RefreshCw } from 'lucide-react';
 import { Question } from '../types';
+import { VoiceNarrator } from './VoiceNarrator';
 
 interface AiExplainerModalProps {
   isOpen: boolean;
@@ -124,18 +125,21 @@ export const AiExplainerModal: React.FC<AiExplainerModalProps> = ({
           ) : (
             <div className="space-y-4">
               <div className="p-4 rounded-xl bg-indigo-950/30 border border-indigo-500/20">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-indigo-500/20">
                   <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5 uppercase tracking-wide">
                     {isAiGenerated ? <Sparkles className="w-3.5 h-3.5 text-purple-400" /> : <BookOpen className="w-3.5 h-3.5 text-blue-400" />}
                     {isAiGenerated ? 'Gemini Concept Explanation' : 'Standard Curriculum Explanation'}
                   </span>
-                  <button
-                    onClick={fetchAiExplanation}
-                    title="Regenerate explanation"
-                    className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 text-xs flex items-center gap-1 transition"
-                  >
-                    <RefreshCw className="w-3 h-3" /> Retry
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <VoiceNarrator text={explanationText} label="Listen to Tutor" compact />
+                    <button
+                      onClick={fetchAiExplanation}
+                      title="Regenerate explanation"
+                      className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 text-xs flex items-center gap-1 transition cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" /> Retry
+                    </button>
+                  </div>
                 </div>
                 <div className="text-sm text-slate-200 whitespace-pre-line leading-relaxed font-normal">
                   {explanationText}

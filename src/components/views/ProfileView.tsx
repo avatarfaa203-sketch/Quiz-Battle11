@@ -12,11 +12,13 @@ import {
   LogOut,
   ChevronRight,
   BookOpen,
-  Info
+  Info,
+  Building2,
+  Trophy
 } from 'lucide-react';
-import { Badge, UserStats, ShsLevel } from '../../types';
+import { Badge, UserStats, ShsLevel, StudentSchoolStats } from '../../types';
 import { ALL_BADGES } from '../../data/badges';
-import { calculateLevelFromXP, updateUsername, updateShsLevel } from '../../utils/storage';
+import { calculateLevelFromXP, updateUsername, updateShsLevel, updateSchoolName, getStoredAuthToken } from '../../utils/storage';
 import { soundEffects } from '../../utils/audio';
 import { useAuth } from '../../utils/AuthContext';
 
@@ -39,11 +41,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenAdmin,
   onOpenAuth,
 }) => {
-  const { user, isAuthenticated, logout, updateProfile } = useAuth();
+  const { user, isAuthenticated, isGuest, logout, updateProfile, exitGuestMode } = useAuth();
   const [editingName, setEditingName] = useState(false);
-  const [nameInput, setNameInput] = useState(user?.username || userStats.username);
+  const [nameInput, setNameInput] = useState(user?.username || (isGuest ? 'Guest Scholar' : userStats.username));
+  const currentSchoolName = user?.schoolName || (isGuest ? 'Guest Mode (Unregistered)' : (userStats.schoolName || 'Senior High School'));
+  const [editingSchool, setEditingSchool] = useState(false);
+  const [schoolInput, setSchoolInput] = useState(currentSchoolName);
+  const [schoolError, setSchoolError] = useState<string | null>(null);
   const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null);
   const [isUpdatingLevel, setIsUpdatingLevel] = useState(false);
+  const [schoolStats, setSchoolStats] = useState<StudentSchoolStats | null>(null);
 
   const currentShsLevel: ShsLevel = user?.shsLevel || userStats.shsLevel || 'SHS 2';
 
@@ -51,6 +58,24 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const accuracy = userStats.totalQuestions > 0 
     ? Math.round((userStats.totalCorrect / userStats.totalQuestions) * 100) 
     : 100;
+
+  React.useEffect(() => {
+    const fetchSchoolData = async () => {
+      try {
+        const token = getStoredAuthToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch('/api/leaderboards', { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.userSchoolStats) {
+            setSchoolStats(data.userSchoolStats);
+          }
+        }
+      } catch {}
+    };
+    fetchSchoolData();
+  }, [userStats.xp, currentSchoolName]);
 
   const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +98,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     const updated = updateShsLevel(newLevel);
     onStatsUpdated(updated);
     setIsUpdatingLevel(false);
+  };
+
+  const handleSaveSchool = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSchoolError(null);
+    const trimmed = schoolInput.trim();
+    if (!trimmed || trimmed.length < 3 || !/[a-zA-Z]{2,}/.test(trimmed)) {
+      setSchoolError('Please enter a valid school name (at least 3 characters).');
+      return;
+    }
+    soundEffects.playClick();
+    if (isAuthenticated) {
+      await updateProfile({ schoolName: trimmed });
+    }
+    const updated = updateSchoolName(trimmed);
+    onStatsUpdated(updated);
+    setEditingSchool(false);
   };
 
   const unlockedSet = new Set(userStats.unlockedBadgeIds || []);
@@ -139,6 +181,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <GraduationCap className="w-3.5 h-3.5 text-indigo-400" />
                 {currentShsLevel} Scholar
               </span>
+              <span className="text-slate-500">•</span>
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/35 text-amber-300 font-extrabold flex items-center gap-1">
+                <Building2 className="w-3.5 h-3.5 text-amber-400" />
+                {currentSchoolName}
+              </span>
             </div>
 
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1 text-xs">
@@ -182,6 +229,121 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 ></div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* School Challenge Standing & Inter-School Stats */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-amber-950/30 via-slate-900 to-slate-900 border border-amber-500/30 space-y-4 shadow-xl">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+                  School Challenge Standing
+                </h2>
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  {schoolStats ? `Rank #${schoolStats.schoolRank} in Ghana` : 'Ranked'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Senior High School collective performance powered by registered student achievements.
+              </p>
+            </div>
+          </div>
+
+          {!editingSchool && (
+            <button
+              onClick={() => {
+                setSchoolInput(currentSchoolName);
+                setSchoolError(null);
+                setEditingSchool(true);
+              }}
+              className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 transition cursor-pointer"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Change School</span>
+            </button>
+          )}
+        </div>
+
+        {/* School Name Edit Form */}
+        {editingSchool && (
+          <form onSubmit={handleSaveSchool} className="p-4 rounded-2xl bg-slate-800/80 border border-amber-500/40 space-y-3">
+            <label className="block text-xs font-bold text-amber-300 uppercase tracking-wider">
+              Update Registered Senior High School
+            </label>
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <input
+                type="text"
+                value={schoolInput}
+                onChange={(e) => setSchoolInput(e.target.value)}
+                maxLength={60}
+                placeholder="e.g. Achimota School, Prempeh College, Wesley Girls"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm outline-none focus:border-amber-500"
+              />
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer shrink-0"
+                >
+                  Save School
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingSchool(false);
+                    setSchoolError(null);
+                  }}
+                  className="px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold transition cursor-pointer shrink-0"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+            {schoolError && (
+              <p className="text-xs text-rose-400 font-semibold">{schoolError}</p>
+            )}
+          </form>
+        )}
+
+        {/* 4 School Challenge Metric Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+          <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 text-center">
+            <span className="text-[11px] text-slate-400 block font-semibold mb-1">Registered School</span>
+            <span className="text-sm sm:text-base font-black text-amber-300 truncate block">
+              {currentSchoolName}
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 text-center">
+            <span className="text-[11px] text-slate-400 block font-semibold mb-1">National School Rank</span>
+            <span className="text-xl sm:text-2xl font-black text-amber-400">
+              {schoolStats ? `#${schoolStats.schoolRank}` : '#1'}
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 text-center">
+            <span className="text-[11px] text-slate-400 block font-semibold mb-1">Your Contribution</span>
+            <span className="text-xl sm:text-2xl font-black text-emerald-400">
+              {userStats.xp.toLocaleString()} XP
+            </span>
+            <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">
+              {schoolStats ? `${schoolStats.contributionPercent}% of school score` : '100% of school score'}
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 text-center">
+            <span className="text-[11px] text-slate-400 block font-semibold mb-1">Total School XP</span>
+            <span className="text-xl sm:text-2xl font-black text-white">
+              {schoolStats ? schoolStats.totalSchoolXp.toLocaleString() : userStats.xp.toLocaleString()}
+            </span>
+            <span className="text-[10px] text-indigo-300 block mt-0.5 font-medium">
+              {schoolStats ? `${schoolStats.studentCount} active scholars` : '1 active scholar'}
+            </span>
           </div>
         </div>
       </div>

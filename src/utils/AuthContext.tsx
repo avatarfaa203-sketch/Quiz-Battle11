@@ -1,16 +1,27 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, UserStats, ShsLevel } from '../types';
-import { getStoredAuthToken, setStoredAuthToken, loadUserStats, saveUserStats } from '../utils/storage';
+import { 
+  getStoredAuthToken, 
+  setStoredAuthToken, 
+  loadUserStats, 
+  saveUserStats,
+  isGuestModeActive,
+  setGuestModeActive,
+  loadGuestStats
+} from '../utils/storage';
 
 interface AuthContextType {
   user: UserProfile | null;
   token: string | null;
   isAuthenticated: boolean;
+  isGuest: boolean;
   isLoading: boolean;
   login: (identifier: string, pass: string) => Promise<{ success: boolean; message?: string }>;
-  register: (username: string, email: string, pass: string, avatar?: string, shsLevel?: ShsLevel) => Promise<{ success: boolean; message?: string }>;
+  register: (username: string, email: string, pass: string, avatar?: string, shsLevel?: ShsLevel, schoolName?: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
-  updateProfile: (data: { username?: string; avatar?: string; shsLevel?: ShsLevel }) => Promise<{ success: boolean; message?: string }>;
+  continueAsGuest: () => void;
+  exitGuestMode: () => void;
+  updateProfile: (data: { username?: string; avatar?: string; shsLevel?: ShsLevel; schoolName?: string }) => Promise<{ success: boolean; message?: string }>;
   syncLocalStatsToServer: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -23,6 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; onUserStatsLoad
 }) => {
   const [token, setToken] = useState<string | null>(() => getStoredAuthToken());
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [isGuest, setIsGuest] = useState<boolean>(() => isGuestModeActive());
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch /api/auth/me on mount or token change
@@ -30,6 +42,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; onUserStatsLoad
     const activeToken = getStoredAuthToken();
     if (!activeToken) {
       setUser(null);
+      if (isGuestModeActive()) {
+        setIsGuest(true);
+        if (onUserStatsLoaded) onUserStatsLoaded(loadGuestStats());
+      } else {
+        setIsGuest(false);
+      }
       setIsLoading(false);
       return;
     }
@@ -44,6 +62,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; onUserStatsLoad
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.user) {
+          setGuestModeActive(false);
+          setIsGuest(false);
           setUser(data.user);
           // Sync server stats into localStorage for seamless client operation
           if (data.user.stats) {
@@ -71,6 +91,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; onUserStatsLoad
     refreshUser();
   }, []);
 
+  const continueAsGuest = () => {
+    setGuestModeActive(true);
+    setIsGuest(true);
+    const guestStats = loadGuestStats();
+    if (onUserStatsLoaded) onUserStatsLoaded(guestStats);
+  };
+
+  const exitGuestMode = () => {
+    setGuestModeActive(false);
+    setIsGuest(false);
+  };
+
   const login = async (identifier: string, pass: string) => {
     try {
       const res = await fetch('/api/auth/login', {
@@ -80,6 +112,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; onUserStatsLoad
       });
       const data = await res.json();
       if (data.success && data.token && data.user) {
+        setGuestModeActive(false);
+        setIsGuest(false);
         setStoredAuthToken(data.token);
         setToken(data.token);
         setUser(data.user);
@@ -95,8 +129,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; onUserStatsLoad
     }
   };
 
-  const register = async (username: string, email: string, pass: string, avatar: string = 'avatar_1', shsLevel: ShsLevel = 'SHS 2') => {
+  const register = async (username: string, email: string, pass: string, avatar: string = 'avatar_1', shsLevel: ShsLevel = 'SHS 2', schoolName: string = '') => {
     try {
+      setGuestModeActive(false);
+      setIsGuest(false);
       // Backward compatibility: pass existing local stats as initial stats to preserve progress
       const localStats = loadUserStats();
 
@@ -109,15 +145,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; onUserStatsLoad
           password: pass,
           avatar,
           shsLevel,
+          schoolName,
           initialStats: {
             ...localStats,
             shsLevel,
+            schoolName,
           },
         }),
       });
 
       const data = await res.json();
       if (data.success && data.token && data.user) {
+        setGuestModeActive(false);
+        setIsGuest(false);
         setStoredAuthToken(data.token);
         setToken(data.token);
         setUser(data.user);
@@ -134,6 +174,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; onUserStatsLoad
   };
 
   const logout = async () => {
+    setGuestModeActive(false);
+    setIsGuest(false);
     const activeToken = getStoredAuthToken();
     if (activeToken) {
       try {
@@ -151,7 +193,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; onUserStatsLoad
     setUser(null);
   };
 
-  const updateProfile = async (data: { username?: string; avatar?: string; shsLevel?: ShsLevel }) => {
+  const updateProfile = async (data: { username?: string; avatar?: string; shsLevel?: ShsLevel; schoolName?: string }) => {
     const activeToken = getStoredAuthToken();
     if (!activeToken) {
       // Offline / guest update
@@ -159,6 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; onUserStatsLoad
       if (data.username) localStats.username = data.username;
       if (data.avatar) localStats.avatar = data.avatar;
       if (data.shsLevel) localStats.shsLevel = data.shsLevel;
+      if (data.schoolName) localStats.schoolName = data.schoolName;
       saveUserStats(localStats);
       if (onUserStatsLoaded) onUserStatsLoaded(localStats);
       return { success: true };
@@ -213,10 +256,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; onUserStatsLoad
         user,
         token,
         isAuthenticated: Boolean(user),
+        isGuest,
         isLoading,
         login,
         register,
         logout,
+        continueAsGuest,
+        exitGuestMode,
         updateProfile,
         syncLocalStatsToServer,
         refreshUser,

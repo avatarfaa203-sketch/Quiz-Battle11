@@ -206,7 +206,7 @@ function getSessionToken(req: Request): string | undefined {
 // POST /api/auth/register
 app.post('/api/auth/register', (req: Request, res: Response) => {
   try {
-    const { username, email, password, avatar, initialStats, shsLevel } = req.body;
+    const { username, email, password, avatar, initialStats, shsLevel, schoolName } = req.body;
 
     if (!username || typeof username !== 'string' || username.trim().length < 2) {
       return res.status(400).json({ success: false, message: 'Username must be at least 2 characters.' });
@@ -217,15 +217,19 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
     if (!password || typeof password !== 'string' || password.length < 6) {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });
     }
+    if (!schoolName || typeof schoolName !== 'string' || schoolName.trim().length < 3 || !/[a-zA-Z]{2,}/.test(schoolName.trim())) {
+      return res.status(400).json({ success: false, message: 'A valid Senior High School name is required (e.g. Achimota School, Prempeh College).' });
+    }
 
     const cleanEmail = email.toLowerCase().trim();
     const cleanUsername = username.trim();
+    const cleanSchoolName = schoolName.trim();
 
     if (db.findByEmail(cleanEmail)) {
       return res.status(400).json({ success: false, message: 'An account with this email already exists.' });
     }
     if (db.findByUsername(cleanUsername)) {
-      return res.status(400).json({ success: false, message: 'This username is already taken. Please choose another.' });
+      return res.status(400).json({ success: false, message: 'Username already exists. Please choose another username.' });
     }
 
     const { salt, hash } = hashPassword(password);
@@ -235,6 +239,7 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
       passwordHash: hash,
       salt,
       avatar: avatar || 'avatar_1',
+      schoolName: cleanSchoolName,
       shsLevel: shsLevel === 'SHS 1' || shsLevel === 'SHS 2' || shsLevel === 'SHS 3' ? shsLevel : 'SHS 2',
       initialStats: initialStats && typeof initialStats === 'object' ? initialStats : undefined,
     });
@@ -339,12 +344,21 @@ app.put('/api/user/profile', (req: Request, res: Response) => {
     return res.status(401).json({ success: false, message: 'Authentication required.' });
   }
 
-  const { username, avatar, shsLevel } = req.body;
+  const { username, avatar, shsLevel, schoolName } = req.body;
   if (username && username.trim() !== user.username) {
     const existing = db.findByUsername(username.trim());
     if (existing && existing.id !== user.id) {
-      return res.status(400).json({ success: false, message: 'Username is already taken.' });
+      return res.status(400).json({ success: false, message: 'Username already exists. Please choose another username.' });
     }
+  }
+
+  let cleanSchoolName: string | undefined = undefined;
+  if (schoolName !== undefined) {
+    const trimmed = String(schoolName).trim();
+    if (trimmed.length < 3 || !/[a-zA-Z]{2,}/.test(trimmed)) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid school name (at least 3 characters).' });
+    }
+    cleanSchoolName = trimmed;
   }
 
   const validShsLevel = shsLevel === 'SHS 1' || shsLevel === 'SHS 2' || shsLevel === 'SHS 3' ? shsLevel : undefined;
@@ -352,6 +366,7 @@ app.put('/api/user/profile', (req: Request, res: Response) => {
   const updated = db.updateUserProfile(user.id, {
     username: username ? String(username).trim() : undefined,
     avatar: avatar ? String(avatar) : undefined,
+    schoolName: cleanSchoolName,
     shsLevel: validShsLevel,
   });
 
@@ -469,18 +484,26 @@ app.get('/api/leaderboards', (req: Request, res: Response) => {
     const token = getSessionToken(req);
     const currentUser = validateSession(token);
 
-    const allUsers = db.getAllUsers();
+    const allUsers = db.getAllUsers().filter((u) => {
+      // Exclude any hardcoded, demo or sample users
+      if (!u.email || u.email.endsWith('@quizbattle.local')) return false;
+      // Must be a real registered student with real XP/progress data
+      return u.stats && (u.stats.xp > 0 || u.stats.gamesPlayed > 0 || u.stats.wins > 0);
+    });
 
-    // Map to leaderboard entry
+    // Map to student leaderboard entry
     const entries = allUsers.map((u) => {
       const accuracy = u.stats.totalQuestions > 0
         ? Math.round((u.stats.totalCorrect / u.stats.totalQuestions) * 100)
         : 100;
 
+      const school = (u.schoolName || u.stats?.schoolName || 'Senior High School').trim();
+
       return {
         id: u.id,
         username: u.username,
         avatar: u.avatar,
+        schoolName: school,
         xp: u.stats.xp,
         wins: u.stats.wins,
         accuracy,
@@ -511,21 +534,87 @@ app.get('/api/leaderboards', (req: Request, res: Response) => {
       rank: idx + 1,
     }));
 
-    // Find current user's rank
+    // Find current user's individual rank
     let currentUserRank: number | null = null;
     if (currentUser) {
       const found = globalWithRank.find((r) => r.id === currentUser.id);
       if (found) currentUserRank = found.rank;
     }
 
+    // ----------------------------------------------------
+    // School Challenge Aggregation (Real registered students only)
+    // ----------------------------------------------------
+    const schoolMap = new Map<string, {
+      displayName: string;
+      totalXp: number;
+      students: Set<string>;
+    }>();
+
+    for (const u of allUsers) {
+      const rawSchool = (u.schoolName || u.stats?.schoolName || '').trim();
+      if (!rawSchool) continue;
+      const norm = rawSchool.toLowerCase();
+      if (!schoolMap.has(norm)) {
+        schoolMap.set(norm, {
+          displayName: rawSchool,
+          totalXp: 0,
+          students: new Set<string>(),
+        });
+      }
+      const group = schoolMap.get(norm)!;
+      group.totalXp += (u.stats?.xp || 0);
+      group.students.add(u.id);
+    }
+
+    const currentSchoolNorm = currentUser
+      ? (currentUser.schoolName || currentUser.stats?.schoolName || '').trim().toLowerCase()
+      : '';
+
+    const schoolEntries = Array.from(schoolMap.values())
+      .map((item) => ({
+        rank: 0,
+        schoolName: item.displayName,
+        totalXp: item.totalXp,
+        studentCount: item.students.size,
+        isCurrentSchool: currentSchoolNorm ? item.displayName.toLowerCase() === currentSchoolNorm : false,
+      }))
+      .sort((a, b) => b.totalXp - a.totalXp || b.studentCount - a.studentCount)
+      .map((e, idx) => ({
+        ...e,
+        rank: idx + 1,
+      }));
+
+    // Student's personal contribution and school standing
+    let userSchoolStats = null;
+    if (currentUser) {
+      const userSchool = (currentUser.schoolName || currentUser.stats?.schoolName || '').trim();
+      if (userSchool) {
+        const found = schoolEntries.find((s) => s.schoolName.toLowerCase() === userSchool.toLowerCase());
+        const userXp = currentUser.stats?.xp || 0;
+        const totalSchoolXp = found ? found.totalXp : userXp;
+        const percent = totalSchoolXp > 0 ? Math.min(100, Math.round((userXp / totalSchoolXp) * 100)) : 100;
+
+        userSchoolStats = {
+          schoolName: userSchool,
+          schoolRank: found ? found.rank : 1,
+          totalSchoolXp: totalSchoolXp,
+          studentCount: found ? found.studentCount : 1,
+          userContributionXp: userXp,
+          contributionPercent: percent,
+        };
+      }
+    }
+
     return res.json({
       global: globalWithRank.slice(0, 50),
       weekly: weeklyWithRank.slice(0, 50),
+      schools: schoolEntries.slice(0, 50),
       currentUserRank,
+      userSchoolStats,
     });
   } catch (err) {
     console.error('[Leaderboard Error]:', err);
-    return res.status(500).json({ global: [], weekly: [], currentUserRank: null });
+    return res.status(500).json({ global: [], weekly: [], schools: [], currentUserRank: null, userSchoolStats: null });
   }
 });
 

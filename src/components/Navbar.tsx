@@ -14,7 +14,8 @@ import {
   ShieldAlert,
   GraduationCap,
   Atom,
-  Flame
+  Flame,
+  Building2
 } from 'lucide-react';
 import { UserStats, ShsLevel } from '../types';
 import { calculateLevelFromXP } from '../utils/storage';
@@ -36,7 +37,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuth,
   onOpenAdmin,
 }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isGuest, exitGuestMode } = useAuth();
   const [muted, setMuted] = useState(soundEffects.isMuted());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -53,7 +54,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'dashboard', label: 'Dashboard', icon: Trophy },
     { id: 'practice', label: 'Curriculum Quiz', icon: BookOpen },
     { id: 'nsmq', label: 'NSMQ Practice', icon: Flame, badge: 'New' },
-    { id: 'multiplayer', label: '1v1 Challenge', icon: Users },
+    { id: 'multiplayer', label: 'Multiplayer Arena', icon: Users },
+    { id: 'school-challenge', label: 'School Challenge', icon: Building2, badge: 'Inter-School' },
     { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
     { id: 'profile', label: 'Profile', icon: User },
   ];
@@ -129,25 +131,48 @@ export const Navbar: React.FC<NavbarProps> = ({
               {muted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
             </button>
 
+            {/* Guest Action: Obvious Sign In / Create Account Button */}
+            {isGuest && (
+              <button
+                onClick={onOpenAuth}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition cursor-pointer"
+                title="Create an account or sign in to save your progress permanently"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Save Progress / </span>
+                <span>Sign In</span>
+              </button>
+            )}
+
             {/* Student Level & Account Pill */}
             <button
               onClick={onOpenAuth}
-              className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 hover:border-indigo-500/50 transition cursor-pointer"
+              className={`flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full transition cursor-pointer ${
+                isGuest 
+                  ? 'bg-amber-500/10 border border-amber-500/40 hover:border-amber-400 text-amber-200' 
+                  : 'bg-slate-800/80 border border-slate-700 hover:border-indigo-500/50'
+              }`}
             >
-              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white shadow-inner">
-                {user?.avatar ? user.username.substring(0, 2).toUpperCase() : levelInfo.level}
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-inner ${
+                isGuest 
+                  ? 'bg-gradient-to-tr from-amber-500 to-orange-600 text-slate-950 font-black' 
+                  : 'bg-gradient-to-tr from-indigo-500 to-purple-500'
+              }`}>
+                {isGuest ? 'G' : user?.avatar ? user.username.substring(0, 2).toUpperCase() : levelInfo.level}
               </div>
               <div className="text-left hidden sm:block">
-                <div className="text-xs font-bold text-slate-200 leading-tight truncate max-w-[110px] flex items-center gap-1">
-                  <span>{user ? user.username : userStats.username}</span>
-                  <span className="text-[10px] font-extrabold text-indigo-300 px-1.5 py-0.2 rounded bg-indigo-500/20 border border-indigo-500/30">
-                    {activeShsLevel}
+                <div className="text-xs font-bold text-slate-200 leading-tight truncate max-w-[120px] flex items-center gap-1">
+                  <span>{isGuest ? 'Guest Scholar' : user ? user.username : userStats.username}</span>
+                  <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${
+                    isGuest 
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' 
+                      : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                  }`}>
+                    {isGuest ? 'Guest' : activeShsLevel}
                   </span>
                 </div>
                 <div className="text-[10px] text-indigo-400 font-semibold leading-tight flex items-center gap-1">
-                  <span>Lvl {levelInfo.level}</span>
-                  <span>•</span>
-                  <span>{userStats.xp} XP</span>
+                  <span>{isGuest ? 'Temporary Session' : `Lvl ${levelInfo.level} • ${userStats.xp} XP`}</span>
                 </div>
               </div>
             </button>
@@ -165,21 +190,39 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
           <div className="lg:hidden border-t border-slate-800 bg-[#0b0f19] px-4 pt-3 pb-6 space-y-1.5 shadow-2xl">
-            <div className="py-2.5 px-3.5 mb-2 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+            <div className={`py-2.5 px-3.5 mb-2 rounded-2xl border flex items-center justify-between ${
+              isGuest ? 'bg-amber-950/20 border-amber-500/30' : 'bg-slate-900 border border-slate-800'
+            }`}>
               <div>
-                <div className="text-xs text-slate-400">Student Profile</div>
+                <div className="text-xs text-slate-400">{isGuest ? 'Guest Session' : 'Student Profile'}</div>
                 <div className="font-extrabold text-sm text-slate-200 flex items-center gap-1.5">
-                  {userStats.username}
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                    {activeShsLevel}
+                  {isGuest ? 'Guest Scholar' : userStats.username}
+                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                    isGuest ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                  }`}>
+                    {isGuest ? 'Guest' : activeShsLevel}
                   </span>
                 </div>
               </div>
               <div className="text-right">
-                <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                  Level {levelInfo.level}
-                </span>
-                <div className="text-xs text-indigo-400 font-semibold">{userStats.xp} XP</div>
+                {isGuest ? (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenAuth();
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow transition cursor-pointer"
+                  >
+                    Sign In
+                  </button>
+                ) : (
+                  <>
+                    <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      Level {levelInfo.level}
+                    </span>
+                    <div className="text-xs text-indigo-400 font-semibold">{userStats.xp} XP</div>
+                  </>
+                )}
               </div>
             </div>
 

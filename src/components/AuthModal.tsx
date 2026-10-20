@@ -9,9 +9,10 @@ import {
   Lock, 
   LogOut, 
   ArrowRight, 
-  AlertCircle,
   GraduationCap,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle,
+  Building2
 } from 'lucide-react';
 import { UserStats, ShsLevel } from '../types';
 import { updateUsername, updateShsLevel } from '../utils/storage';
@@ -53,6 +54,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   // Form states
   const [usernameInput, setUsernameInput] = useState(user?.username || userStats.username);
+  const [schoolNameInput, setSchoolNameInput] = useState(user?.schoolName || userStats.schoolName || '');
   const [emailInput, setEmailInput] = useState(user?.email || '');
   const [passwordInput, setPasswordInput] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState(user?.avatar || userStats.avatar || 'avatar_1');
@@ -99,6 +101,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setErrorMessage('Username must be at least 2 characters.');
       return;
     }
+    if (!schoolNameInput.trim() || schoolNameInput.trim().length < 3 || !/[a-zA-Z]{2,}/.test(schoolNameInput.trim())) {
+      setErrorMessage('Please enter a valid Senior High School name (at least 3 characters).');
+      return;
+    }
     if (!emailInput.trim() || !emailInput.includes('@')) {
       setErrorMessage('Please enter a valid school or personal email.');
       return;
@@ -120,7 +126,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       emailInput.trim(),
       passwordInput,
       selectedAvatar,
-      selectedShsLevel
+      selectedShsLevel,
+      schoolNameInput.trim()
     );
     setLoading(false);
 
@@ -190,11 +197,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     soundEffects.playClick();
 
     if (isAuthenticated) {
+      if (schoolNameInput.trim() && (schoolNameInput.trim().length < 3 || !/[a-zA-Z]{2,}/.test(schoolNameInput.trim()))) {
+        setErrorMessage('Please enter a valid Senior High School name (at least 3 characters).');
+        return;
+      }
       setLoading(true);
       const res = await updateProfile({
         username: usernameInput.trim(),
         avatar: selectedAvatar,
         shsLevel: selectedShsLevel,
+        schoolName: schoolNameInput.trim() || undefined,
       });
       setLoading(false);
 
@@ -311,6 +323,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-indigo-500 outline-none text-white font-medium text-sm transition"
                 required
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                <span>Senior High School</span>
+                <span className="text-[10px] text-amber-400 font-semibold lowercase">School Challenge</span>
+              </label>
+              <div className="relative">
+                <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  value={schoolNameInput}
+                  onChange={(e) => setSchoolNameInput(e.target.value)}
+                  maxLength={60}
+                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-indigo-500 outline-none text-white font-medium text-sm transition"
+                  placeholder="e.g. Achimota School, Prempeh College"
+                />
+              </div>
             </div>
 
             {/* SHS Level Selector */}
@@ -491,6 +521,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       maxLength={20}
                       className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 focus:border-indigo-500 outline-none text-white text-sm"
                       placeholder="e.g. MensahScience"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+                    <span>Senior High School Name</span>
+                    <span className="text-[10px] text-rose-400 font-bold">* Required</span>
+                  </label>
+                  <div className="relative">
+                    <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      value={schoolNameInput}
+                      onChange={(e) => setSchoolNameInput(e.target.value)}
+                      maxLength={60}
+                      className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 focus:border-indigo-500 outline-none text-white text-sm"
+                      placeholder="e.g. Achimota School, Prempeh College"
                       required
                     />
                   </div>

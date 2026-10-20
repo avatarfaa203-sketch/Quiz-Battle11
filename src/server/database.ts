@@ -10,6 +10,7 @@ export interface ServerUserRecord {
   passwordHash: string;
   salt: string;
   avatar: string;
+  schoolName?: string;
   shsLevel?: ShsLevel;
   createdAt: string;
   stats: UserStats;
@@ -39,15 +40,13 @@ export class JsonDatabase {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           for (const u of parsed) {
+            // Exclude any demo or test users
+            if (u.email && u.email.endsWith('@quizbattle.local')) continue;
             this.users.set(u.id, u);
             if (u.email) this.emailIndex.set(u.email.toLowerCase().trim(), u.id);
             if (u.username) this.usernameIndex.set(u.username.toLowerCase().trim(), u.id);
           }
         }
-      } else {
-        // Seed initial demo users for the leaderboard so the world feels active
-        this.seedDemoUsers();
-        this.saveDatabase();
       }
     } catch (err) {
       console.error('[DB] Failed to load users.json:', err);
@@ -62,60 +61,6 @@ export class JsonDatabase {
       fs.renameSync(tempPath, DB_FILE);
     } catch (err) {
       console.error('[DB] Failed to write users.json:', err);
-    }
-  }
-
-  private seedDemoUsers() {
-    const demoSeed = [
-      { username: 'QuantumAce', xp: 8450, wins: 54, losses: 4, correct: 280, total: 295, streak: 8, mpWins: 24 },
-      { username: 'BioGenesis', xp: 7120, wins: 46, losses: 7, correct: 245, total: 265, streak: 6, mpWins: 18 },
-      { username: 'VectorSigma', xp: 6490, wins: 41, losses: 6, correct: 215, total: 240, streak: 9, mpWins: 16 },
-      { username: 'CyberScribe', xp: 5820, wins: 38, losses: 8, correct: 195, total: 220, streak: 5, mpWins: 14 },
-      { username: 'NewtonianForce', xp: 5210, wins: 33, losses: 9, correct: 180, total: 205, streak: 4, mpWins: 12 },
-      { username: 'CosmicVoyager', xp: 4640, wins: 29, losses: 11, correct: 160, total: 190, streak: 3, mpWins: 9 },
-      { username: 'GrammarKnight', xp: 3950, wins: 24, losses: 12, correct: 140, total: 170, streak: 4, mpWins: 7 },
-      { username: 'PolymathPro', xp: 3410, wins: 21, losses: 14, correct: 125, total: 155, streak: 2, mpWins: 5 },
-      { username: 'BinaryFalcon', xp: 2890, wins: 18, losses: 15, correct: 110, total: 140, streak: 3, mpWins: 4 },
-      { username: 'AtomSplitter', xp: 2350, wins: 15, losses: 16, correct: 95, total: 125, streak: 2, mpWins: 3 },
-    ];
-
-    for (const d of demoSeed) {
-      const id = 'usr_' + crypto.randomUUID().substring(0, 12);
-      const salt = crypto.randomBytes(16).toString('hex');
-      const hash = crypto.pbkdf2Sync('QuizMaster2026!', salt, 1000, 64, 'sha512').toString('hex');
-      
-      const stats: UserStats = {
-        id,
-        username: d.username,
-        level: Math.max(1, Math.floor(d.xp / 450) + 1),
-        xp: d.xp,
-        gamesPlayed: d.wins + d.losses,
-        wins: d.wins,
-        losses: d.losses,
-        totalCorrect: d.correct,
-        totalQuestions: d.total,
-        currentStreak: d.streak,
-        bestStreak: d.streak + 2,
-        multiplayerWins: d.mpWins,
-        multiplayerLosses: Math.max(1, Math.floor(d.mpWins * 0.4)),
-        unlockedBadgeIds: ['quiz-starter', 'first-victory', 'maths-master', 'science-master', 'first-multiplayer-win'],
-        recentGames: []
-      };
-
-      const record: ServerUserRecord = {
-        id,
-        username: d.username,
-        email: `${d.username.toLowerCase()}@quizbattle.local`,
-        passwordHash: hash,
-        salt,
-        avatar: 'avatar_1',
-        createdAt: new Date().toISOString(),
-        stats
-      };
-
-      this.users.set(id, record);
-      this.emailIndex.set(record.email.toLowerCase(), id);
-      this.usernameIndex.set(record.username.toLowerCase(), id);
     }
   }
 
@@ -141,18 +86,21 @@ export class JsonDatabase {
     passwordHash: string;
     salt: string;
     avatar?: string;
+    schoolName: string;
     shsLevel?: ShsLevel;
     initialStats?: Partial<UserStats>;
   }): ServerUserRecord {
     const id = 'usr_' + crypto.randomUUID().substring(0, 16);
     const now = new Date().toISOString();
     const studentShsLevel: ShsLevel = params.shsLevel || (params.initialStats?.shsLevel as ShsLevel) || 'SHS 2';
+    const cleanSchoolName = (params.schoolName || params.initialStats?.schoolName || 'Senior High School').trim();
 
     const stats: UserStats = {
       id,
       username: params.username.trim(),
       email: params.email.toLowerCase().trim(),
       avatar: params.avatar || 'avatar_1',
+      schoolName: cleanSchoolName,
       shsLevel: studentShsLevel,
       level: 1,
       xp: 0,
@@ -177,6 +125,7 @@ export class JsonDatabase {
       passwordHash: params.passwordHash,
       salt: params.salt,
       avatar: params.avatar || 'avatar_1',
+      schoolName: cleanSchoolName,
       shsLevel: studentShsLevel,
       createdAt: now,
       stats
@@ -198,8 +147,12 @@ export class JsonDatabase {
       id,
       username: user.username,
       email: user.email,
+      schoolName: newStats.schoolName || user.schoolName || user.stats.schoolName,
       shsLevel: newStats.shsLevel || user.stats.shsLevel || user.shsLevel || 'SHS 2',
     };
+    if (newStats.schoolName) {
+      user.schoolName = newStats.schoolName;
+    }
     if (newStats.shsLevel) {
       user.shsLevel = newStats.shsLevel;
     }
@@ -207,7 +160,7 @@ export class JsonDatabase {
     return user;
   }
 
-  public updateUserProfile(id: string, updates: { username?: string; avatar?: string; passwordHash?: string; salt?: string; shsLevel?: ShsLevel }): ServerUserRecord | null {
+  public updateUserProfile(id: string, updates: { username?: string; avatar?: string; passwordHash?: string; salt?: string; shsLevel?: ShsLevel; schoolName?: string }): ServerUserRecord | null {
     const user = this.users.get(id);
     if (!user) return null;
 
@@ -221,6 +174,12 @@ export class JsonDatabase {
     if (updates.avatar) {
       user.avatar = updates.avatar;
       user.stats.avatar = updates.avatar;
+    }
+
+    if (updates.schoolName) {
+      const cleanSchool = updates.schoolName.trim();
+      user.schoolName = cleanSchool;
+      user.stats.schoolName = cleanSchool;
     }
 
     if (updates.shsLevel) {

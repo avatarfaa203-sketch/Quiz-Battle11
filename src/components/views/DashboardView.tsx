@@ -14,11 +14,14 @@ import {
   CheckCircle2,
   XCircle,
   Swords,
-  GraduationCap
+  GraduationCap,
+  Building2,
+  ChevronRight
 } from 'lucide-react';
 import { UserStats, ShsLevel } from '../../types';
 import { calculateLevelFromXP } from '../../utils/storage';
 import { soundEffects } from '../../utils/audio';
+import { useAuth } from '../../utils/AuthContext';
 
 interface DashboardViewProps {
   userStats: UserStats;
@@ -31,6 +34,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigate,
   onOpenAuth,
 }) => {
+  const { isGuest } = useAuth();
   const levelInfo = calculateLevelFromXP(userStats.xp);
   const accuracy = userStats.totalQuestions > 0 
     ? Math.round((userStats.totalCorrect / userStats.totalQuestions) * 100) 
@@ -64,25 +68,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
-                  {userStats.username}
+                  {isGuest ? 'Guest Scholar' : userStats.username}
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center gap-1">
+                <span className={`px-2.5 py-0.5 rounded-full border text-xs font-bold flex items-center gap-1 ${
+                  isGuest 
+                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' 
+                    : 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                }`}>
                   <GraduationCap className="w-3.5 h-3.5" />
-                  {currentShsLevel}
+                  {isGuest ? 'Guest Mode' : currentShsLevel}
                 </span>
                 <button
                   onClick={onOpenAuth}
                   className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold underline underline-offset-2 ml-1 cursor-pointer"
                 >
-                  Edit Profile
+                  {isGuest ? 'Sign In / Register' : 'Edit Profile'}
                 </button>
               </div>
               <p className="text-sm font-semibold text-indigo-400 flex items-center gap-1.5 mt-0.5">
                 <Medal className="w-4 h-4 text-amber-400" />
-                {levelInfo.rankTitle} • Ghanaian Senior High Scholar
+                {isGuest ? 'Temporary Session Scholar • Practice & Explore' : `${levelInfo.rankTitle} • Ghanaian Senior High Scholar`}
               </p>
               <p className="text-xs text-slate-400 mt-1">
-                Estimated Ranking: <span className="text-white font-bold">#{estimatedRank}</span> • {userStats.unlockedBadgeIds?.length || 1} Badges Earned
+                {isGuest 
+                  ? 'Session practice active • Sign in to save XP and appear on leaderboards'
+                  : `Estimated Ranking: #${estimatedRank} • ${userStats.unlockedBadgeIds?.length || 1} Badges Earned`}
               </p>
             </div>
           </div>
@@ -105,6 +115,62 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Guest Mode Notice & Action Banner */}
+      {isGuest && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-950/40 via-slate-900 to-indigo-950/40 border border-amber-500/40 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <div className="font-extrabold text-sm sm:text-base text-white">
+                Browsing in Guest Mode (Temporary Session)
+              </div>
+              <p className="text-xs text-slate-300">
+                You have unrestricted access to practice curriculum quizzes and NSMQ rounds. Create an account or sign in to save your XP, earn badges, and join the School Leaderboard!
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onOpenAuth}
+            className="self-stretch sm:self-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition cursor-pointer shrink-0 text-center"
+          >
+            Sign In / Create Account
+          </button>
+        </div>
+      )}
+
+      {/* Featured Inter-School Challenge Banner */}
+      <div className="relative overflow-hidden rounded-3xl border border-amber-500/35 bg-gradient-to-r from-amber-950/40 via-slate-900 to-indigo-950/40 p-5 sm:p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/30 shrink-0">
+            <Building2 className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                School Challenge
+              </span>
+              <span className="text-xs text-slate-400">• Inter-School Championship</span>
+            </div>
+            <h2 className="text-lg sm:text-xl font-black text-white mt-0.5">
+              Represent <span className="text-amber-400">{userStats.schoolName || 'Your Senior High School'}</span>
+            </h2>
+            <p className="text-xs text-slate-300">
+              Your quiz and battle XP contributes directly to your school's standing on the National Leaderboard!
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => handleAction('school-challenge')}
+          className="self-stretch sm:self-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+        >
+          <span>View School Leaderboard</span>
+          <ChevronRight className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Main Feature Cards */}

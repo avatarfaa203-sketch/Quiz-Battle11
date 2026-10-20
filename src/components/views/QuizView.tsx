@@ -22,6 +22,7 @@ import { SHS_SUBJECTS, getCurriculumTopics } from '../../data/curriculum';
 import { loadAllQuestions, recordQuizCompletion } from '../../utils/storage';
 import { soundEffects } from '../../utils/audio';
 import { AiExplainerModal } from '../AiExplainerModal';
+import { VoiceNarrator } from '../VoiceNarrator';
 
 interface QuizViewProps {
   mode: 'battle' | 'practice';
@@ -643,11 +644,14 @@ export const QuizView: React.FC<QuizViewProps> = ({
             </div>
 
             {/* Clear, Mathematically Accurate Built-in Explanation */}
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs sm:text-sm text-slate-300 leading-relaxed space-y-1">
-              <span className="font-bold text-indigo-300 block text-xs uppercase tracking-wider">
-                Step-by-Step Curriculum Explanation:
-              </span>
-              <p>{currentQ.explanation}</p>
+            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs sm:text-sm text-slate-300 leading-relaxed space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
+                <span className="font-bold text-indigo-300 block text-xs uppercase tracking-wider">
+                  Step-by-Step Curriculum Explanation:
+                </span>
+                <VoiceNarrator text={currentQ.explanation} label="Listen to Explanation" compact />
+              </div>
+              <p className="pt-1">{currentQ.explanation}</p>
             </div>
 
             {/* Next Question / Finish Button */}

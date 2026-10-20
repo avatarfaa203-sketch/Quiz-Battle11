@@ -20,6 +20,7 @@ import {
 import { Difficulty, Question, ShsLevel, Subject, UserStats } from '../../types';
 import { loadAllQuestions, recordQuizCompletion } from '../../utils/storage';
 import { soundEffects } from '../../utils/audio';
+import { VoiceNarrator } from '../VoiceNarrator';
 
 interface NsmqPracticeViewProps {
   userStats: UserStats;
@@ -565,9 +566,12 @@ export const NsmqPracticeView: React.FC<NsmqPracticeViewProps> = ({
               )}
             </div>
 
-            <div className="text-xs text-slate-300 leading-relaxed bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/60">
-              <strong className="text-amber-300 block mb-1">Scientific Explanation:</strong>
-              {currentQ.explanation}
+            <div className="text-xs text-slate-300 leading-relaxed bg-slate-900/60 p-4 rounded-xl border border-slate-700/60 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                <strong className="text-amber-300 font-bold">Scientific Explanation:</strong>
+                <VoiceNarrator text={currentQ.explanation} label="Listen to Explanation" compact />
+              </div>
+              <p className="pt-1">{currentQ.explanation}</p>
             </div>
 
             <div className="flex justify-end pt-2">
