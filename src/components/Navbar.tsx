@@ -52,10 +52,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   const navItems = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'dashboard', label: 'Dashboard', icon: Trophy },
+    { id: 'daily-challenge', label: 'Daily Challenge', icon: Sparkles, badge: '5 Qs' },
     { id: 'practice', label: 'Curriculum Quiz', icon: BookOpen },
     { id: 'nsmq', label: 'NSMQ Practice', icon: Flame, badge: 'New' },
     { id: 'multiplayer', label: 'Multiplayer Arena', icon: Users },
-    { id: 'school-challenge', label: 'School Challenge', icon: Building2, badge: 'Inter-School' },
+    { id: 'school-challenge', label: 'School Challenge', icon: Building2, badge: 'Coming Soon' },
     { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
     { id: 'profile', label: 'Profile', icon: User },
   ];

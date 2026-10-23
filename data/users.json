@@ -144,5 +144,565 @@
       ],
       "lastPlayedDate": "2026-10-20"
     }
+  },
+  {
+    "id": "usr_60a9b458-91bd-41",
+    "username": "Student_1792566092904",
+    "email": "student_1792566092904@school.edu.gh",
+    "passwordHash": "437a13a9d589cdcb9b712805697079448b9b0c9f014b1397cd6d55e5748c9aea9bb139f5f7ccd84e09c1554c4b12e55f014f99f5185fa6366427d4480e88a89c",
+    "salt": "6a6f08927d9ca3b02e6e0967db8cca27",
+    "avatar": "avatar_1",
+    "schoolName": "Achimota School",
+    "shsLevel": "SHS 2",
+    "createdAt": "2026-10-21T07:01:32.919Z",
+    "stats": {
+      "id": "usr_60a9b458-91bd-41",
+      "username": "Student_1792566092904",
+      "email": "student_1792566092904@school.edu.gh",
+      "avatar": "avatar_1",
+      "schoolName": "Achimota School",
+      "shsLevel": "SHS 2",
+      "level": 1,
+      "xp": 450,
+      "gamesPlayed": 0,
+      "wins": 3,
+      "losses": 0,
+      "totalCorrect": 0,
+      "totalQuestions": 0,
+      "currentStreak": 0,
+      "bestStreak": 0,
+      "multiplayerWins": 0,
+      "multiplayerLosses": 0,
+      "unlockedBadgeIds": [
+        "quiz-starter"
+      ],
+      "recentGames": []
+    }
+  },
+  {
+    "id": "usr_4613c675-ae6d-49",
+    "username": "Student2_1792566092932",
+    "email": "student2_1792566092932@school.edu.gh",
+    "passwordHash": "7cdaefa03f759b1b7b48e4f44f6e6f03f31fd3163aee7df0b12a0a7eaf6ba9fa196404bd79e4d3785b17db10640201cea179eb3957bb61e6a7f6034c9509c8ef",
+    "salt": "6fe86f0ad74ac8d6f40b9ddd2be0fc4e",
+    "avatar": "avatar_1",
+    "schoolName": "Achimota School",
+    "shsLevel": "SHS 3",
+    "createdAt": "2026-10-21T07:01:32.936Z",
+    "stats": {
+      "id": "usr_4613c675-ae6d-49",
+      "username": "Student2_1792566092932",
+      "email": "student2_1792566092932@school.edu.gh",
+      "avatar": "avatar_1",
+      "schoolName": "Achimota School",
+      "shsLevel": "SHS 3",
+      "level": 1,
+      "xp": 350,
+      "gamesPlayed": 0,
+      "wins": 2,
+      "losses": 0,
+      "totalCorrect": 0,
+      "totalQuestions": 0,
+      "currentStreak": 0,
+      "bestStreak": 0,
+      "multiplayerWins": 0,
+      "multiplayerLosses": 0,
+      "unlockedBadgeIds": [
+        "quiz-starter"
+      ],
+      "recentGames": []
+    }
+  },
+  {
+    "id": "usr_1a173512-4303-42",
+    "username": "Akosua156086",
+    "email": "akosua156086@achimota.edu.gh",
+    "passwordHash": "b3545fe2dc23c4c29f76d86fccae818117800a992eec5eac7910255ece602c23cb54223f302550ecfd751cc94c1532b4d0d7ca81e30aa579205b06c60ccf04e0",
+    "salt": "27233bf69db840b18c93fbe1eb03a978",
+    "avatar": "avatar_1",
+    "schoolName": "Achimota Secondary School",
+    "shsLevel": "SHS 2",
+    "createdAt": "2026-10-23T19:02:36.220Z",
+    "stats": {
+      "id": "usr_1a173512-4303-42",
+      "username": "Akosua156086",
+      "email": "akosua156086@achimota.edu.gh",
+      "avatar": "avatar_1",
+      "schoolName": "Achimota Secondary School",
+      "shsLevel": "SHS 2",
+      "level": 2,
+      "xp": 345,
+      "gamesPlayed": 1,
+      "wins": 1,
+      "losses": 0,
+      "totalCorrect": 5,
+      "totalQuestions": 5,
+      "currentStreak": 1,
+      "bestStreak": 1,
+      "multiplayerWins": 0,
+      "multiplayerLosses": 0,
+      "unlockedBadgeIds": [
+        "quiz-starter",
+        "first-victory",
+        "speed-demon",
+        "perfect-score",
+        "science-master"
+      ],
+      "recentGames": [
+        {
+          "id": "game_1792782156239",
+          "date": "Oct 23, 07:02 PM",
+          "subject": "Physics",
+          "difficulty": "hard",
+          "score": 5,
+          "totalQuestions": 5,
+          "xpEarned": 345,
+          "mode": "practice"
+        }
+      ],
+      "lastPlayedDate": "2026-10-23"
+    }
+  },
+  {
+    "id": "usr_90e5541d-9fd3-4e",
+    "username": "Kofi156086",
+    "email": "kofi156086@achimota.edu.gh",
+    "passwordHash": "9bc8d21f85784fb2776e2d0ce08d7afe4e9ea4b3958277646c5d41f86878cca05d514fa90cc4c47e76aab2d3fb4d224ea98b56b455ca026248218a5d88a53868",
+    "salt": "e30e8c86afb9b83d874bf8efad0e9855",
+    "avatar": "avatar_1",
+    "schoolName": "Achimota School",
+    "shsLevel": "SHS 2",
+    "createdAt": "2026-10-23T19:02:36.303Z",
+    "stats": {
+      "id": "usr_90e5541d-9fd3-4e",
+      "username": "Kofi156086",
+      "email": "kofi156086@achimota.edu.gh",
+      "avatar": "avatar_1",
+      "schoolName": "Achimota School",
+      "shsLevel": "SHS 2",
+      "level": 1,
+      "xp": 230,
+      "gamesPlayed": 1,
+      "wins": 1,
+      "losses": 0,
+      "totalCorrect": 4,
+      "totalQuestions": 5,
+      "currentStreak": 1,
+      "bestStreak": 1,
+      "multiplayerWins": 0,
+      "multiplayerLosses": 0,
+      "unlockedBadgeIds": [
+        "quiz-starter",
+        "first-victory",
+        "speed-demon",
+        "science-master"
+      ],
+      "recentGames": [
+        {
+          "id": "game_1792782156307",
+          "date": "Oct 23, 07:02 PM",
+          "subject": "Chemistry",
+          "difficulty": "medium",
+          "score": 4,
+          "totalQuestions": 5,
+          "xpEarned": 230,
+          "mode": "practice"
+        }
+      ],
+      "lastPlayedDate": "2026-10-23"
+    }
+  },
+  {
+    "id": "usr_fb7220ed-9817-45",
+    "username": "Prempeh156086",
+    "email": "ace156086@prempeh.edu.gh",
+    "passwordHash": "247665c1bd6a0578ef146e0b844325404aa6e9cc682029a4b6e5792d083b588125ed98716d2f7b75d3737309728774ac4dfe85a3c547954ef7fe8ebbeb111f63",
+    "salt": "5420908d12dc58db4041882838e9209b",
+    "avatar": "avatar_1",
+    "schoolName": "Prempeh College",
+    "shsLevel": "SHS 3",
+    "createdAt": "2026-10-23T19:02:36.312Z",
+    "stats": {
+      "id": "usr_fb7220ed-9817-45",
+      "username": "Prempeh156086",
+      "email": "ace156086@prempeh.edu.gh",
+      "avatar": "avatar_1",
+      "schoolName": "Prempeh College",
+      "shsLevel": "SHS 3",
+      "level": 1,
+      "xp": 110,
+      "gamesPlayed": 1,
+      "wins": 0,
+      "losses": 0,
+      "totalCorrect": 3,
+      "totalQuestions": 5,
+      "currentStreak": 1,
+      "bestStreak": 1,
+      "multiplayerWins": 0,
+      "multiplayerLosses": 0,
+      "unlockedBadgeIds": [
+        "quiz-starter",
+        "speed-demon"
+      ],
+      "recentGames": [
+        {
+          "id": "game_1792782156316",
+          "date": "Oct 23, 07:02 PM",
+          "subject": "Core Mathematics",
+          "difficulty": "easy",
+          "score": 3,
+          "totalQuestions": 5,
+          "xpEarned": 110,
+          "mode": "practice"
+        }
+      ],
+      "lastPlayedDate": "2026-10-23"
+    }
+  },
+  {
+    "id": "usr_c380514f-5fd1-46",
+    "username": "DailyScholar190588",
+    "email": "daily_190588@ghana.edu.gh",
+    "passwordHash": "b2ad56b62fcc6f4b0f36d5a99804188f32f44632cdc1d03c357235c23be76f7a292b179b530c6cf569b83ba4a21cfa98fda10bf356a638f672e3548d69fda34b",
+    "salt": "e230447c51802458d4608312550910c3",
+    "avatar": "avatar_1",
+    "schoolName": "St. Peter's Boys SHS",
+    "shsLevel": "SHS 2",
+    "createdAt": "2026-10-23T19:03:10.668Z",
+    "stats": {
+      "id": "usr_c380514f-5fd1-46",
+      "username": "DailyScholar190588",
+      "email": "daily_190588@ghana.edu.gh",
+      "avatar": "avatar_1",
+      "schoolName": "St. Peter's Boys SHS",
+      "shsLevel": "SHS 2",
+      "level": 1,
+      "xp": 205,
+      "gamesPlayed": 1,
+      "wins": 1,
+      "losses": 0,
+      "totalCorrect": 5,
+      "totalQuestions": 5,
+      "currentStreak": 1,
+      "bestStreak": 1,
+      "multiplayerWins": 0,
+      "multiplayerLosses": 0,
+      "unlockedBadgeIds": [
+        "quiz-starter",
+        "first-victory",
+        "speed-demon",
+        "perfect-score"
+      ],
+      "recentGames": [
+        {
+          "id": "daily-1792782190687",
+          "date": "Oct 23, 07:03 PM",
+          "subject": "General Knowledge",
+          "difficulty": "medium",
+          "score": 5,
+          "totalQuestions": 5,
+          "xpEarned": 205,
+          "mode": "practice"
+        }
+      ],
+      "lastPlayedDate": "2026-10-23",
+      "lastDailyChallengeDate": "2026-10-23"
+    }
+  },
+  {
+    "id": "usr_e8d7ec4f-794c-4b",
+    "username": "DailyScholar270620",
+    "email": "daily_270620@ghana.edu.gh",
+    "passwordHash": "cfe491ad8eed8494d21c0ed12d196490637ca02bf1343ebd0b575ce242ca217fc1683e83cf6ccaa9fdb1e5392e34205630a2bbf0f560f8bf711fea2d4726aa64",
+    "salt": "e228442fea97a2cf68d7ce160b7ef9b3",
+    "avatar": "avatar_1",
+    "schoolName": "St. Peter's Boys SHS",
+    "shsLevel": "SHS 2",
+    "createdAt": "2026-10-23T19:04:30.705Z",
+    "stats": {
+      "id": "usr_e8d7ec4f-794c-4b",
+      "username": "DailyScholar270620",
+      "email": "daily_270620@ghana.edu.gh",
+      "avatar": "avatar_1",
+      "schoolName": "St. Peter's Boys SHS",
+      "shsLevel": "SHS 2",
+      "level": 1,
+      "xp": 205,
+      "gamesPlayed": 1,
+      "wins": 1,
+      "losses": 0,
+      "totalCorrect": 5,
+      "totalQuestions": 5,
+      "currentStreak": 1,
+      "bestStreak": 1,
+      "multiplayerWins": 0,
+      "multiplayerLosses": 0,
+      "unlockedBadgeIds": [
+        "quiz-starter",
+        "first-victory",
+        "speed-demon",
+        "perfect-score"
+      ],
+      "recentGames": [
+        {
+          "id": "daily-1792782270731",
+          "date": "Oct 23, 07:04 PM",
+          "subject": "General Knowledge",
+          "difficulty": "medium",
+          "score": 5,
+          "totalQuestions": 5,
+          "xpEarned": 205,
+          "mode": "practice"
+        }
+      ],
+      "lastPlayedDate": "2026-10-23",
+      "lastDailyChallengeDate": "2026-10-23"
+    }
+  },
+  {
+    "id": "usr_0795914e-1b2d-42",
+    "username": "DailyScholar313188",
+    "email": "daily_313188@ghana.edu.gh",
+    "passwordHash": "31ef0b12c6926abfcac7ec14f92d7c0ef0a5a36777c3169c2d374496a533f59260b8cb5a4c7460dd2574dad5442d42737045b1bd76b2e3e8103c196d5427d97b",
+    "salt": "dff4e37d83c3a7b3dfcf9461780caaf2",
+    "avatar": "avatar_1",
+    "schoolName": "St. Peter's Boys SHS",
+    "shsLevel": "SHS 2",
+    "createdAt": "2026-10-23T19:05:13.282Z",
+    "stats": {
+      "id": "usr_0795914e-1b2d-42",
+      "username": "DailyScholar313188",
+      "email": "daily_313188@ghana.edu.gh",
+      "avatar": "avatar_1",
+      "schoolName": "St. Peter's Boys SHS",
+      "shsLevel": "SHS 2",
+      "level": 1,
+      "xp": 205,
+      "gamesPlayed": 1,
+      "wins": 1,
+      "losses": 0,
+      "totalCorrect": 5,
+      "totalQuestions": 5,
+      "currentStreak": 1,
+      "bestStreak": 1,
+      "multiplayerWins": 0,
+      "multiplayerLosses": 0,
+      "unlockedBadgeIds": [
+        "quiz-starter",
+        "first-victory",
+        "speed-demon",
+        "perfect-score"
+      ],
+      "recentGames": [
+        {
+          "id": "daily-1792782313305",
+          "date": "Oct 23, 07:05 PM",
+          "subject": "General Knowledge",
+          "difficulty": "medium",
+          "score": 5,
+          "totalQuestions": 5,
+          "xpEarned": 205,
+          "mode": "practice"
+        }
+      ],
+      "lastPlayedDate": "2026-10-23",
+      "lastDailyChallengeDate": "2026-10-23"
+    }
+  },
+  {
+    "id": "usr_11d92dc1-8c36-4c",
+    "username": "DailyScholar338289",
+    "email": "daily_338289@ghana.edu.gh",
+    "passwordHash": "e42cc1593415a98a525059b83164de1d7c20c1429cc4feb18e2164efeb261b03aa91da70f49d70c596085bd0ab3d18c7e9a431dc51896adca920ee604f932d7c",
+    "salt": "acb59d5cb41b8d8de1bb0f67556251bc",
+    "avatar": "avatar_1",
+    "schoolName": "St. Peter's Boys SHS",
+    "shsLevel": "SHS 2",
+    "createdAt": "2026-10-23T19:05:38.382Z",
+    "stats": {
+      "id": "usr_11d92dc1-8c36-4c",
+      "username": "DailyScholar338289",
+      "email": "daily_338289@ghana.edu.gh",
+      "avatar": "avatar_1",
+      "schoolName": "St. Peter's Boys SHS",
+      "shsLevel": "SHS 2",
+      "level": 1,
+      "xp": 205,
+      "gamesPlayed": 1,
+      "wins": 1,
+      "losses": 0,
+      "totalCorrect": 5,
+      "totalQuestions": 5,
+      "currentStreak": 1,
+      "bestStreak": 1,
+      "multiplayerWins": 0,
+      "multiplayerLosses": 0,
+      "unlockedBadgeIds": [
+        "quiz-starter",
+        "first-victory",
+        "speed-demon",
+        "perfect-score"
+      ],
+      "recentGames": [
+        {
+          "id": "daily-1792782338406",
+          "date": "Oct 23, 07:05 PM",
+          "subject": "General Knowledge",
+          "difficulty": "medium",
+          "score": 5,
+          "totalQuestions": 5,
+          "xpEarned": 205,
+          "mode": "practice"
+        }
+      ],
+      "lastPlayedDate": "2026-10-23",
+      "lastDailyChallengeDate": "2026-10-23"
+    }
+  },
+  {
+    "id": "usr_8ff301bf-7f4d-4f",
+    "username": "Akosua360681",
+    "email": "akosua360681@achimota.edu.gh",
+    "passwordHash": "e1639e777e26817dd8f356ef29378a78e4078b7e1cc1f7958c5fab090b10dde875da0f0bd026c6d133cccb3aec2fa840c10114699be0d5b2af27ae373f642c93",
+    "salt": "6d2037508563fdf25598ba489ba52b8e",
+    "avatar": "avatar_1",
+    "schoolName": "Achimota Secondary School",
+    "shsLevel": "SHS 2",
+    "createdAt": "2026-10-23T19:06:00.787Z",
+    "stats": {
+      "id": "usr_8ff301bf-7f4d-4f",
+      "username": "Akosua360681",
+      "email": "akosua360681@achimota.edu.gh",
+      "avatar": "avatar_1",
+      "schoolName": "Achimota Secondary School",
+      "shsLevel": "SHS 2",
+      "level": 2,
+      "xp": 345,
+      "gamesPlayed": 1,
+      "wins": 1,
+      "losses": 0,
+      "totalCorrect": 5,
+      "totalQuestions": 5,
+      "currentStreak": 1,
+      "bestStreak": 1,
+      "multiplayerWins": 0,
+      "multiplayerLosses": 0,
+      "unlockedBadgeIds": [
+        "quiz-starter",
+        "first-victory",
+        "speed-demon",
+        "perfect-score",
+        "science-master"
+      ],
+      "recentGames": [
+        {
+          "id": "game_1792782360801",
+          "date": "Oct 23, 07:06 PM",
+          "subject": "Physics",
+          "difficulty": "hard",
+          "score": 5,
+          "totalQuestions": 5,
+          "xpEarned": 345,
+          "mode": "practice"
+        }
+      ],
+      "lastPlayedDate": "2026-10-23"
+    }
+  },
+  {
+    "id": "usr_ff4e4df0-eac9-4a",
+    "username": "Kofi360681",
+    "email": "kofi360681@achimota.edu.gh",
+    "passwordHash": "6708496225409e78922863ec69aa08ae3e97aefe55520e080a4bfa9a4c851b4334f85336959b3a41a5511908b5b8b2994292ea78af4b66ca49776b99d6c0d7ae",
+    "salt": "b8ccc73284c2953a3c2a6635e92af935",
+    "avatar": "avatar_1",
+    "schoolName": "Achimota School",
+    "shsLevel": "SHS 2",
+    "createdAt": "2026-10-23T19:06:00.807Z",
+    "stats": {
+      "id": "usr_ff4e4df0-eac9-4a",
+      "username": "Kofi360681",
+      "email": "kofi360681@achimota.edu.gh",
+      "avatar": "avatar_1",
+      "schoolName": "Achimota School",
+      "shsLevel": "SHS 2",
+      "level": 1,
+      "xp": 230,
+      "gamesPlayed": 1,
+      "wins": 1,
+      "losses": 0,
+      "totalCorrect": 4,
+      "totalQuestions": 5,
+      "currentStreak": 1,
+      "bestStreak": 1,
+      "multiplayerWins": 0,
+      "multiplayerLosses": 0,
+      "unlockedBadgeIds": [
+        "quiz-starter",
+        "first-victory",
+        "speed-demon",
+        "science-master"
+      ],
+      "recentGames": [
+        {
+          "id": "game_1792782360811",
+          "date": "Oct 23, 07:06 PM",
+          "subject": "Chemistry",
+          "difficulty": "medium",
+          "score": 4,
+          "totalQuestions": 5,
+          "xpEarned": 230,
+          "mode": "practice"
+        }
+      ],
+      "lastPlayedDate": "2026-10-23"
+    }
+  },
+  {
+    "id": "usr_18647333-6cb2-46",
+    "username": "Prempeh360681",
+    "email": "ace360681@prempeh.edu.gh",
+    "passwordHash": "56a5ae8bbd092f15b8abc09ee3ff4bc2468285d54f541862e230054de2b84b4e13aee8b087e392c95ecaeb9db05fc000ba5bd3be1cb95ad1bdb52a7819aabe8b",
+    "salt": "cefa91fcd0978dda94144f35e6df3e00",
+    "avatar": "avatar_1",
+    "schoolName": "Prempeh College",
+    "shsLevel": "SHS 3",
+    "createdAt": "2026-10-23T19:06:00.817Z",
+    "stats": {
+      "id": "usr_18647333-6cb2-46",
+      "username": "Prempeh360681",
+      "email": "ace360681@prempeh.edu.gh",
+      "avatar": "avatar_1",
+      "schoolName": "Prempeh College",
+      "shsLevel": "SHS 3",
+      "level": 1,
+      "xp": 110,
+      "gamesPlayed": 1,
+      "wins": 0,
+      "losses": 0,
+      "totalCorrect": 3,
+      "totalQuestions": 5,
+      "currentStreak": 1,
+      "bestStreak": 1,
+      "multiplayerWins": 0,
+      "multiplayerLosses": 0,
+      "unlockedBadgeIds": [
+        "quiz-starter",
+        "speed-demon"
+      ],
+      "recentGames": [
+        {
+          "id": "game_1792782360823",
+          "date": "Oct 23, 07:06 PM",
+          "subject": "Core Mathematics",
+          "difficulty": "easy",
+          "score": 3,
+          "totalQuestions": 5,
+          "xpEarned": 110,
+          "mode": "practice"
+        }
+      ],
+      "lastPlayedDate": "2026-10-23"
+    }
   }
 ]

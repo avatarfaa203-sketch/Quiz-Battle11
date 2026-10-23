@@ -21,6 +21,7 @@ import { LeaderboardView } from './components/views/LeaderboardView';
 import { ProfileView } from './components/views/ProfileView';
 import { AdminView } from './components/views/AdminView';
 import { NsmqPracticeView } from './components/views/NsmqPracticeView';
+import { DailyChallengeView } from './components/views/DailyChallengeView';
 import { GraduationCap } from 'lucide-react';
 
 function MainPlatform({
@@ -151,6 +152,15 @@ function MainPlatform({
           <DashboardView
             userStats={userStats}
             onNavigate={handleNavigate}
+            onOpenAuth={() => setAuthModalOpen(true)}
+          />
+        )}
+
+        {currentView === 'daily-challenge' && (
+          <DailyChallengeView
+            userStats={userStats}
+            onStatsUpdated={onStatsUpdated}
+            onCancel={() => handleNavigate('dashboard')}
             onOpenAuth={() => setAuthModalOpen(true)}
           />
         )}

@@ -8,7 +8,8 @@ import { GoogleGenAI } from '@google/genai';
 import { multiplayerManager } from './src/server/multiplayer';
 import { db } from './src/server/database';
 import { hashPassword, verifyPassword, createSession, validateSession, destroySession, sanitizeUser } from './src/server/auth';
-import { computeQuizProgress } from './src/server/progress';
+import { computeQuizProgress, updateDailyStreak, calculateLevel, checkBadges } from './src/server/progress';
+import { getDailyChallengeQuestions, getTodayDateStr } from './src/utils/dailyChallenge';
 
 dotenv.config();
 
@@ -115,7 +116,7 @@ Keep the language accessible, encouraging, and appropriate for high school stude
 // 2. ROOM MULTIPLAYER REST & SSE ENDPOINTS
 // ----------------------------------------------------
 app.post('/api/rooms/create', (req: Request, res: Response) => {
-  const { hostName, playerId, subject, topic, difficulty, questionCount, timePerQuestion } = req.body;
+  const { hostName, playerId, subject, topic, difficulty, questionCount, timePerQuestion, gameMode } = req.body;
   if (!playerId) {
     return res.status(400).json({ success: false, message: 'Missing playerId' });
   }
@@ -126,8 +127,21 @@ app.post('/api/rooms/create', (req: Request, res: Response) => {
     difficulty || 'medium',
     Number(questionCount) || 5,
     Number(timePerQuestion) || 15,
-    topic || 'All Topics'
+    topic || 'All Topics',
+    gameMode
   );
+  return res.json(result);
+});
+
+app.post('/api/rooms/:code/switch-team', (req: Request, res: Response) => {
+  const { playerId, targetTeam } = req.body;
+  if (!playerId || !targetTeam) {
+    return res.status(400).json({ success: false, message: 'Player ID and target team are required.' });
+  }
+  const result = multiplayerManager.switchTeam(req.params.code, playerId, targetTeam);
+  if (!result.success) {
+    return res.status(400).json(result);
+  }
   return res.json(result);
 });
 
@@ -188,6 +202,117 @@ app.post('/api/rooms/:code/leave', (req: Request, res: Response) => {
   const { playerId } = req.body;
   const result = multiplayerManager.leaveRoom(req.params.code, playerId);
   return res.json(result);
+});
+
+// ----------------------------------------------------
+// DAILY CHALLENGE ENDPOINTS
+// ----------------------------------------------------
+app.get('/api/daily-challenge', (req: Request, res: Response) => {
+  const dateStr = (req.query.date as string) || getTodayDateStr();
+  const questions = getDailyChallengeQuestions(dateStr);
+  const token = getSessionToken(req);
+  const user = validateSession(token);
+  const alreadyCompleted = user?.stats.lastDailyChallengeDate === dateStr;
+
+  return res.json({
+    success: true,
+    date: dateStr,
+    alreadyCompleted,
+    questions: questions.map((q) => multiplayerManager.sanitizeQuestion(q)),
+  });
+});
+
+app.post('/api/daily-challenge/complete', (req: Request, res: Response) => {
+  try {
+    const token = getSessionToken(req);
+    const user = validateSession(token);
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        isGuest: true,
+        message: 'Guest session: Daily Challenge progress is kept in session only.',
+      });
+    }
+
+    const challengeDate = req.body.todayStr || req.body.dateStr || getTodayDateStr();
+    const { correctAnswers, fastAnswersCount } = req.body;
+
+    // Anti-farming verification
+    if (user.stats.lastDailyChallengeDate === challengeDate) {
+      return res.status(400).json({
+        success: false,
+        alreadyCompleted: true,
+        message: "Today's Daily Challenge was already completed. Additional XP cannot be farmed.",
+      });
+    }
+
+    const correct = Math.max(0, Math.min(5, Number(correctAnswers) || 0));
+    const fast = Math.max(0, Math.min(5, Number(fastAnswersCount) || 0));
+    const baseQuestionXp = correct * 25;
+    const speedXp = fast * 10;
+    const bonusXp = 50; // Completion bonus for finishing all 5 questions
+    const totalXpEarned = baseQuestionXp + speedXp + bonusXp;
+
+    user.stats.xp += totalXpEarned;
+    user.stats.gamesPlayed += 1;
+    user.stats.totalCorrect += correct;
+    user.stats.totalQuestions += 5;
+    if (correct >= 4) {
+      user.stats.wins += 1;
+    }
+
+    // Update streak safely with calendar day logic
+    const streakResult = updateDailyStreak(user.stats, challengeDate);
+    user.stats.currentStreak = streakResult.currentStreak;
+    user.stats.bestStreak = streakResult.bestStreak;
+    user.stats.lastPlayedDate = challengeDate;
+    user.stats.lastDailyChallengeDate = challengeDate;
+
+    // Check level progression
+    const levelData = calculateLevel(user.stats.xp);
+    user.stats.level = levelData.level;
+
+    // Check badges
+    const badgeResult = checkBadges(user.stats, {
+      totalQuestions: 5,
+      correctAnswers: correct,
+      fastAnswersCount: fast,
+    });
+    user.stats.unlockedBadgeIds = badgeResult.allBadgeIds;
+
+    // Add to history
+    user.stats.recentGames.unshift({
+      id: 'daily-' + Date.now(),
+      date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      subject: 'General Knowledge',
+      difficulty: 'medium',
+      score: correct,
+      totalQuestions: 5,
+      xpEarned: totalXpEarned,
+      mode: 'practice',
+    });
+    if (user.stats.recentGames.length > 20) {
+      user.stats.recentGames = user.stats.recentGames.slice(0, 20);
+    }
+
+    db.updateUserStats(user.id, user.stats);
+
+    return res.json({
+      success: true,
+      stats: user.stats,
+      xpEarned: totalXpEarned,
+      totalXpEarned: totalXpEarned,
+      bonusXp,
+      newLevel: user.stats.level,
+      streak: user.stats.currentStreak,
+      currentStreak: user.stats.currentStreak,
+      newBadges: badgeResult.newlyUnlocked,
+    });
+  } catch (err) {
+    console.error('[Daily Challenge Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to record daily challenge result.' });
+  }
 });
 
 // Helper to extract session token from Authorization: Bearer <token> or body
@@ -641,6 +766,7 @@ wss.on('connection', (ws: WebSocket) => {
             data.questionCount,
             data.timePerQuestion,
             data.topic,
+            data.gameMode,
             ws
           );
           break;

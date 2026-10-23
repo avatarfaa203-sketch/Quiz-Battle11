@@ -110,7 +110,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         </h1>
         <p className="text-sm text-slate-400 max-w-xl mx-auto">
           {mainMode === 'schools'
-            ? 'Senior High Schools ranked by the combined academic XP earned by their registered students.'
+            ? 'Inter-school competition — Coming Soon. Registered students will represent their Senior High School in Ghana’s premier academic championship.'
             : 'Rankings calibrated on curriculum quiz mastery, battle victories, and academic accuracy.'}
         </p>
       </div>
@@ -165,7 +165,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               soundEffects.playClick();
               setMainMode('schools');
             }}
-            className={`py-2.5 px-4 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer flex items-center justify-center gap-2 ${
+            className={`py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer flex items-center justify-center gap-1.5 ${
               mainMode === 'schools'
                 ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 shadow-md font-black'
                 : 'text-slate-400 hover:text-white'
@@ -173,6 +173,9 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           >
             <Building2 className="w-4 h-4" />
             <span>School Challenge</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-extrabold uppercase border border-amber-500/40">
+              Soon
+            </span>
           </button>
         </div>
       </div>
@@ -384,21 +387,84 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
       )}
 
       {/* ============================================================== */}
-      {/* MODE 2: SCHOOL CHALLENGE LEADERBOARD                           */}
+      {/* MODE 2: SCHOOL CHALLENGE LEADERBOARD (COMING SOON)             */}
       {/* ============================================================== */}
       {mainMode === 'schools' && (
         <div className="space-y-6">
+          {/* POLISHED COMING SOON HERO BANNER */}
+          <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-amber-950/50 via-slate-900 to-indigo-950/40 border border-amber-500/40 shadow-2xl relative overflow-hidden space-y-5">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-amber-500/30 shrink-0">
+                  <Building2 className="w-7 h-7" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      COMING SOON
+                    </span>
+                    <span className="text-xs text-slate-400 font-semibold">• Inter-School Championship</span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-white">
+                    National Inter-School Competition Is Under Preparation
+                  </h2>
+                </div>
+              </div>
+
+              <div className="px-3.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold shrink-0">
+                In Active Development
+              </div>
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+              Soon, Senior High Schools across Ghana will compete head-to-head on the National Academic Leaderboard! All registered students will rally their curriculum quiz scores, NSMQ challenges, and multiplayer battle victories to crown Ghana's top science high school.
+            </p>
+
+            {/* Upcoming Features Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                  <Trophy className="w-4 h-4 text-amber-400" />
+                  <span>National Championship</span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Combined school XP earned by all registered students will determine the national standings.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                <div className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                  <span>Real Students Only</span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Strict isolation: Guest users cannot influence rankings. Only verified registered accounts qualify.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  <span>XP Preserved</span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Every quiz and battle you complete today will count toward your school's championship qualification.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Student's Personal School Standings & Contribution Banner */}
-          <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-indigo-950/40 border border-amber-500/35 shadow-xl space-y-4">
+          <div className="p-5 sm:p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-amber-500/25 shrink-0">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 font-black shadow shrink-0">
                   <Building2 className="w-6 h-6" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs uppercase font-extrabold text-amber-400 tracking-wider">
-                      {isGuest ? 'School Challenge Participation' : 'Your Registered School'}
+                      {isGuest ? 'School Challenge Participation' : 'Your Enrolled School'}
                     </span>
                     {isGuest && (
                       <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
@@ -411,8 +477,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   </h2>
                   <p className="text-xs text-slate-300">
                     {isGuest 
-                      ? 'You are browsing as Guest. Sign in or create an account with your school to add your quiz points to its national championship score!'
-                      : 'All XP earned in quizzes and battles automatically fuels your school score!'}
+                      ? 'You are browsing as Guest. Register an account with your school to save your XP and qualify your school for the upcoming tournament!'
+                      : 'Your school is registered and enrolled. All current XP you earn will count when inter-school battles launch!'}
                   </p>
                 </div>
               </div>

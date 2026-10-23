@@ -405,14 +405,156 @@ export function recordQuizCompletion(params: {
     }).catch(() => {});
   }
 
-  return {
-    stats,
-    xpEarned,
-    newLevel: newLevelData.level,
-    leveledUp: newLevelData.level > oldLevel,
-    newBadges: newlyUnlocked
-  };
-}
+    return {
+      stats,
+      xpEarned,
+      newLevel: newLevelData.level,
+      leveledUp: newLevelData.level > oldLevel,
+      newBadges: newlyUnlocked
+    };
+  }
+
+  export interface DailyChallengeResult {
+    stats: UserStats;
+    xpEarned: number;
+    bonusXp: number;
+    totalXpEarned: number;
+    newLevel: number;
+    leveledUp: boolean;
+    newBadges: Badge[];
+    alreadyCompletedToday: boolean;
+  }
+
+  export function recordDailyChallengeCompletion(params: {
+    correctAnswers: number;
+    totalQuestions: number;
+    fastAnswersCount: number;
+    todayStr?: string;
+  }): DailyChallengeResult {
+    const stats = loadUserStats();
+    const todayStr = params.todayStr || new Date().toISOString().split('T')[0];
+
+    // Anti-farming check
+    if (stats.lastDailyChallengeDate === todayStr) {
+      return {
+        stats,
+        xpEarned: 0,
+        bonusXp: 0,
+        totalXpEarned: 0,
+        newLevel: stats.level,
+        leveledUp: false,
+        newBadges: [],
+        alreadyCompletedToday: true,
+      };
+    }
+
+    const oldLevel = stats.level;
+    const correct = Math.max(0, Math.min(5, params.correctAnswers));
+    const fast = Math.max(0, Math.min(5, params.fastAnswersCount));
+    const baseQuestionXp = correct * 25;
+    const speedXp = fast * 10;
+    const bonusXp = 50; // Daily Challenge completion bonus
+    const totalXpEarned = baseQuestionXp + speedXp + bonusXp;
+
+    stats.xp += totalXpEarned;
+    stats.gamesPlayed += 1;
+    stats.totalCorrect += correct;
+    stats.totalQuestions += 5;
+    if (correct >= 4) {
+      stats.wins += 1;
+    }
+
+    // Update streak logic
+    const lastDate = stats.lastPlayedDate;
+    if (!lastDate) {
+      stats.currentStreak = 1;
+    } else if (lastDate === todayStr) {
+      // already played today
+    } else {
+      const lastTime = new Date(lastDate + 'T00:00:00Z').getTime();
+      const todayTime = new Date(todayStr + 'T00:00:00Z').getTime();
+      const dayDiff = Math.round((todayTime - lastTime) / (1000 * 60 * 60 * 24));
+      if (dayDiff === 1) {
+        stats.currentStreak = (stats.currentStreak || 0) + 1;
+      } else {
+        stats.currentStreak = 1;
+      }
+    }
+
+    stats.lastPlayedDate = todayStr;
+    stats.lastDailyChallengeDate = todayStr;
+    if (stats.currentStreak > (stats.bestStreak || 0)) {
+      stats.bestStreak = stats.currentStreak;
+    }
+
+    // Check badges
+    const newlyUnlocked: Badge[] = [];
+    const currentUnlocked = new Set(stats.unlockedBadgeIds || []);
+    const checkBadge = (id: string, condition: boolean) => {
+      if (!currentUnlocked.has(id) && condition) {
+        currentUnlocked.add(id);
+        const b = ALL_BADGES.find((item) => item.id === id);
+        if (b) newlyUnlocked.push(b);
+      }
+    };
+
+    checkBadge('quiz-starter', stats.gamesPlayed >= 1);
+    checkBadge('first-victory', stats.wins >= 1);
+    checkBadge('speed-demon', fast >= 1);
+    checkBadge('streak-master', (stats.bestStreak || 0) >= 5);
+    checkBadge('seven-day-streak', (stats.currentStreak || 0) >= 7 || (stats.bestStreak || 0) >= 7);
+    if (correct === 5) {
+      checkBadge('perfect-score', true);
+    }
+
+    const newLevelData = calculateLevelFromXP(stats.xp);
+    stats.level = newLevelData.level;
+    stats.unlockedBadgeIds = Array.from(currentUnlocked);
+
+    stats.recentGames.unshift({
+      id: 'daily-' + Date.now(),
+      date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      subject: 'General Knowledge',
+      difficulty: 'medium',
+      score: correct,
+      totalQuestions: 5,
+      xpEarned: totalXpEarned,
+      mode: 'practice',
+    });
+    if (stats.recentGames.length > 20) {
+      stats.recentGames = stats.recentGames.slice(0, 20);
+    }
+
+    saveUserStats(stats);
+
+    // If authenticated registered student, sync to server
+    const token = getStoredAuthToken();
+    if (token && !isGuestModeActive()) {
+      fetch('/api/daily-challenge/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          correctAnswers: correct,
+          fastAnswersCount: fast,
+          todayStr,
+        }),
+      }).catch(() => {});
+    }
+
+    return {
+      stats,
+      xpEarned: baseQuestionXp + speedXp,
+      bonusXp,
+      totalXpEarned,
+      newLevel: newLevelData.level,
+      leveledUp: newLevelData.level > oldLevel,
+      newBadges: newlyUnlocked,
+      alreadyCompletedToday: false,
+    };
+  }
 
 // Questions Storage (Admin & In-game)
 export function loadAllQuestions(): Question[] {

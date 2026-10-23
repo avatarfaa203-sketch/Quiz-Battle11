@@ -22,7 +22,9 @@ import {
   SanitizedQuestion, 
   MultiplayerRoomState, 
   ReviewData, 
-  MultiplayerFinalResults 
+  MultiplayerFinalResults,
+  MultiplayerMode,
+  MultiplayerTeam 
 } from '../../types';
 import { SUBJECTS } from '../../data/defaultQuestions';
 import { getCurriculumTopics } from '../../data/curriculum';
@@ -54,6 +56,7 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
 
   // Setup options
   const [tab, setTab] = useState<'create' | 'join'>('create');
+  const [gameMode, setGameMode] = useState<MultiplayerMode>('ffa');
   const [subject, setSubject] = useState<Subject>('Core Mathematics');
   const [topic, setTopic] = useState<string>('All Topics (Mixed)');
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
@@ -130,7 +133,16 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
           localStorage.setItem(awardKey, 'true');
           const myStats = serverRoom.finalResults.finalScores.find((p) => p.id === playerId);
           if (myStats) {
-            const isWinner = serverRoom.winnerId === playerId;
+            const myPlayerObj = serverRoom.players.find((p) => p.id === playerId);
+            const myTeam = myPlayerObj?.team;
+            const isWinner = serverRoom.gameMode === '2v2'
+              ? Boolean(serverRoom.finalResults.winningTeam && serverRoom.finalResults.winningTeam === myTeam)
+              : serverRoom.winnerId === playerId;
+
+            const isDraw = serverRoom.gameMode === '2v2'
+              ? serverRoom.finalResults.winningTeam === 'draw'
+              : Boolean(serverRoom.isDraw);
+
             const completion = recordQuizCompletion({
               subject: serverRoom.subject,
               difficulty: serverRoom.difficulty,
@@ -154,7 +166,7 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
                 body: JSON.stringify({
                   roomCode: serverRoom.code,
                   isWinner,
-                  isDraw: serverRoom.isDraw,
+                  isDraw,
                   correctAnswers: myStats.correctAnswers,
                   totalQuestions: myStats.totalQuestions,
                   xpEarned: myStats.xpEarned,
@@ -163,19 +175,19 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
                 }),
               }).catch(() => {});
             }
-          }
 
-          if (serverRoom.winnerId === playerId) {
-            soundEffects.playVictory();
-            confetti({
-              particleCount: 100,
-              spread: 80,
-              origin: { y: 0.6 },
-            });
-          } else if (serverRoom.isDraw) {
-            soundEffects.playVictory();
-          } else {
-            soundEffects.playWrong();
+            if (isWinner) {
+              soundEffects.playVictory();
+              confetti({
+                particleCount: 100,
+                spread: 80,
+                origin: { y: 0.6 },
+              });
+            } else if (isDraw) {
+              soundEffects.playVictory();
+            } else {
+              soundEffects.playWrong();
+            }
           }
         }
       }
@@ -273,6 +285,7 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
         body: JSON.stringify({
           hostName: userStats.username,
           playerId,
+          gameMode,
           subject,
           topic: topic === 'All Topics (Mixed)' ? 'All Topics' : topic,
           difficulty,
@@ -351,6 +364,28 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
       }
     } catch {
       // Handled by next poll
+    }
+  };
+
+  const handleSwitchTeam = async () => {
+    if (!room || room.gameMode !== '2v2') return;
+    soundEffects.playClick();
+    setErrorMsg(null);
+
+    try {
+      const res = await fetch(`/api/rooms/${room.code}/switch-team`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId }),
+      });
+      const data = await res.json();
+      if (data.success && data.room) {
+        syncRoomData(data.room);
+      } else if (data.message) {
+        setErrorMsg(data.message);
+      }
+    } catch {
+      // Handled by polling
     }
   };
 
@@ -454,11 +489,23 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
 
   // ================= PHASE 4: FINAL RESULTS =================
   if (finalResults && room) {
+    const is2v2 = room.gameMode === '2v2';
+    const myPlayerObj = room.players.find((p) => p.id === playerId);
+    const myTeam = myPlayerObj?.team;
     const sortedScores = [...finalResults.finalScores].sort((a, b) => (a.rank || 1) - (b.rank || 1));
     const myStats = sortedScores.find((p) => p.id === playerId);
     const myRank = myStats?.rank || 1;
-    const isWinner = finalResults.winnerId === playerId;
-    const isTiedFirst = finalResults.isDraw && myRank === 1;
+
+    // Team Battle calculations
+    const teamScores = finalResults.teamScores;
+    const teamAScore = teamScores?.teamA ?? 0;
+    const teamBScore = teamScores?.teamB ?? 0;
+    const winningTeam = finalResults.winningTeam;
+    const isTeamWinner = is2v2 && winningTeam && winningTeam === myTeam;
+    const isTeamDraw = is2v2 && winningTeam === 'draw';
+
+    const isWinner = is2v2 ? isTeamWinner : finalResults.winnerId === playerId;
+    const isTiedFirst = is2v2 ? isTeamDraw : (finalResults.isDraw && myRank === 1);
 
     const rankTitles: Record<number, string> = {
       1: isTiedFirst ? 'Tied for 1st Place!' : isWinner ? '1st Place Champion!' : '1st Place!',
@@ -478,13 +525,13 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
       <div className="max-w-2xl mx-auto space-y-6 pb-20">
         <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 border border-indigo-500/30 text-center shadow-2xl space-y-6">
           <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-xl shadow-indigo-500/30">
-            {myRank === 1 ? <Trophy className="w-10 h-10 text-amber-300" /> : <Swords className="w-10 h-10 text-white" />}
+            {isWinner || isTeamWinner ? <Trophy className="w-10 h-10 text-amber-300" /> : <Swords className="w-10 h-10 text-white" />}
           </div>
 
           <div>
             <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
               <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                Battle Completed • {room.subject}
+                {is2v2 ? '2v2 Team Battle Completed' : 'Battle Completed'} • {room.subject}
               </span>
               {room.topic && room.topic !== 'All Topics' && room.topic !== 'All Topics (Mixed)' && (
                 <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
@@ -493,22 +540,94 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
               )}
             </div>
 
-            <h1 className="text-3xl sm:text-4xl font-black text-white mt-1">
-              {rankTitles[myRank] || 'Battle Completed!'}
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              {myRank === 1
-                ? 'Mastery, speed, and precision secured the victory!'
-                : myRank === 2
-                ? 'Strong performance! A very close academic contest.'
-                : 'Great battle! Review the questions and challenge your peers again.'}
-            </p>
+            {is2v2 ? (
+              <div>
+                <h1 className="text-3xl sm:text-4xl font-black text-white mt-1">
+                  {isTeamDraw ? 'Epic Team Draw!' : isTeamWinner ? `Team ${myTeam} Victory! 🏆` : `Team ${winningTeam} Won the Battle`}
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                  {isTeamDraw
+                    ? 'Both Team A and Team B finished with equal combined points!'
+                    : isTeamWinner
+                    ? `Outstanding teamwork! You and your teammate scored higher and claimed victory.`
+                    : `Team ${winningTeam} edged out the contest. Challenge them to a rematch!`}
+                </p>
+              </div>
+            ) : (
+              <div>
+                <h1 className="text-3xl sm:text-4xl font-black text-white mt-1">
+                  {rankTitles[myRank] || 'Battle Completed!'}
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                  {myRank === 1
+                    ? 'Mastery, speed, and precision secured the victory!'
+                    : myRank === 2
+                    ? 'Strong performance! A very close academic contest.'
+                    : 'Great battle! Review the questions and challenge your peers again.'}
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Final Standings (Occupied Positions: 1st, 2nd, 3rd, 4th) */}
+          {/* 2v2 Combined Team Scoreboard */}
+          {is2v2 && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-400 text-left">
+                Final Team Scores
+              </div>
+              <div className="grid grid-cols-2 gap-3 items-center">
+                {/* Team A Card */}
+                <div className={`p-4 rounded-xl border text-center relative ${
+                  winningTeam === 'A'
+                    ? 'bg-blue-950/50 border-blue-500 ring-2 ring-blue-500/50'
+                    : 'bg-slate-900 border-slate-800'
+                }`}>
+                  {winningTeam === 'A' && (
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-500 text-white shadow">
+                      Winning Team
+                    </span>
+                  )}
+                  <div className="text-xs font-extrabold text-blue-300 uppercase tracking-wider">
+                    Team A {myTeam === 'A' && '(Your Team)'}
+                  </div>
+                  <div className="text-3xl font-black text-white mt-1">
+                    {teamAScore} <span className="text-xs text-slate-400 font-medium">pts</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-1">
+                    {room.players.filter((p) => p.team === 'A').map((p) => p.name).join(' & ')}
+                  </div>
+                </div>
+
+                {/* Team B Card */}
+                <div className={`p-4 rounded-xl border text-center relative ${
+                  winningTeam === 'B'
+                    ? 'bg-amber-950/50 border-amber-500 ring-2 ring-amber-500/50'
+                    : 'bg-slate-900 border-slate-800'
+                }`}>
+                  {winningTeam === 'B' && (
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 shadow">
+                      Winning Team
+                    </span>
+                  )}
+                  <div className="text-xs font-extrabold text-amber-300 uppercase tracking-wider">
+                    Team B {myTeam === 'B' && '(Your Team)'}
+                  </div>
+                  <div className="text-3xl font-black text-white mt-1">
+                    {teamBScore} <span className="text-xs text-slate-400 font-medium">pts</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-1">
+                    {room.players.filter((p) => p.team === 'B').map((p) => p.name).join(' & ')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Individual Standings (Occupied Positions: 1st, 2nd, 3rd, 4th) */}
           <div className="space-y-2.5 text-left">
-            <div className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
-              Final Standings ({sortedScores.length} Players)
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1 flex items-center justify-between">
+              <span>Individual Standings ({sortedScores.length} Players)</span>
+              {is2v2 && <span className="text-indigo-400">Team bonuses included</span>}
             </div>
 
             <div className="space-y-2.5">
@@ -516,6 +635,8 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
                 const rank = scoreItem.rank || (idx + 1);
                 const isMe = scoreItem.id === playerId;
                 const styling = rankColors[rank] || rankColors[4];
+                const playerObj = room.players.find((p) => p.id === scoreItem.id);
+                const pTeam = playerObj?.team;
 
                 return (
                   <div
@@ -534,6 +655,15 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
                           {isMe && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-500/40">
                               You
+                            </span>
+                          )}
+                          {is2v2 && pTeam && (
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                              pTeam === 'A'
+                                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            }`}>
+                              Team {pTeam}
                             </span>
                           )}
                           <span className={`text-[11px] font-bold ${styling.text}`}>
@@ -601,6 +731,10 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
       { avatar: 'bg-amber-600', ring: 'ring-amber-500/50', border: 'border-amber-500/30' },
     ];
 
+    const is2v2 = room.gameMode === '2v2';
+    const teamAScore = room.players.filter((p) => p.team === 'A').reduce((acc, p) => acc + (p.score || 0), 0);
+    const teamBScore = room.players.filter((p) => p.team === 'B').reduce((acc, p) => acc + (p.score || 0), 0);
+
     return (
       <div className="max-w-3xl mx-auto space-y-6 pb-20">
         {/* Battle Live Header (Scoreboard for 2 to 4 Players) */}
@@ -611,7 +745,7 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
                 {room.subject} {room.topic && room.topic !== 'All Topics' && room.topic !== 'All Topics (Mixed)' ? `• ${room.topic}` : ''}
               </span>
               <span className="text-xs text-slate-400 font-semibold capitalize">
-                {room.difficulty} • {room.players.length} Contenders Arena
+                {room.difficulty} • {is2v2 ? '2v2 Team Battle Arena' : `${room.players.length} Contenders Arena`}
               </span>
             </div>
 
@@ -630,6 +764,37 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
             </div>
           </div>
 
+          {/* 2v2 Live Team A vs Team B Scoreboard */}
+          {is2v2 && (
+            <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 grid grid-cols-2 gap-3 items-center">
+              <div className={`p-3 rounded-xl border flex items-center justify-between ${
+                me?.team === 'A' ? 'bg-blue-950/40 border-blue-500/60 ring-1 ring-blue-500/50' : 'bg-slate-900/60 border-slate-800'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                  <span className="font-extrabold text-blue-300 text-xs sm:text-sm">TEAM A</span>
+                  {me?.team === 'A' && <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded font-bold">You</span>}
+                </div>
+                <div className="text-right">
+                  <span className="text-lg sm:text-xl font-black text-white">{teamAScore} pts</span>
+                </div>
+              </div>
+
+              <div className={`p-3 rounded-xl border flex items-center justify-between ${
+                me?.team === 'B' ? 'bg-amber-950/40 border-amber-500/60 ring-1 ring-amber-500/50' : 'bg-slate-900/60 border-slate-800'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                  <span className="font-extrabold text-amber-300 text-xs sm:text-sm">TEAM B</span>
+                  {me?.team === 'B' && <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-bold">You</span>}
+                </div>
+                <div className="text-right">
+                  <span className="text-lg sm:text-xl font-black text-white">{teamBScore} pts</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Player Cards (2, 3, or 4 Players) */}
           <div className={`grid gap-2.5 ${
             room.players.length === 2 ? 'grid-cols-2' : room.players.length === 3 ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4'
@@ -637,7 +802,11 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
             {room.players.map((p, idx) => {
               const isMe = p.id === playerId;
               const hasAnswered = Boolean(p.currentAnswer);
-              const color = playerColors[idx % playerColors.length];
+              const color = is2v2
+                ? p.team === 'A'
+                  ? { avatar: 'bg-blue-600', ring: 'ring-blue-500/50', border: 'border-blue-500/40' }
+                  : { avatar: 'bg-amber-600', ring: 'ring-amber-500/50', border: 'border-amber-500/40' }
+                : playerColors[idx % playerColors.length];
 
               return (
                 <div
@@ -655,6 +824,13 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
                     <div className="flex items-center gap-1">
                       <span className="text-xs font-bold text-white truncate">{p.name}</span>
                       {p.isHost && <Crown className="w-3 h-3 text-amber-400 shrink-0" />}
+                      {is2v2 && p.team && (
+                        <span className={`text-[9px] font-black px-1.5 py-0.2 rounded ${
+                          p.team === 'A' ? 'bg-blue-500/20 text-blue-300' : 'bg-amber-500/20 text-amber-300'
+                        }`}>
+                          {p.team}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center justify-between text-[11px] mt-0.5">
                       <span className="font-extrabold text-indigo-300">{p.score} pts</span>
@@ -747,8 +923,17 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
                 {reviewData.playerResults.map((pr) => (
                   <div key={pr.id} className="p-2 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
-                    <span className="font-semibold text-slate-300 truncate text-[11px]">{pr.name}</span>
-                    <span className={`font-bold text-[11px] ${pr.isCorrect ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    <div className="flex items-center gap-1 min-w-0">
+                      {is2v2 && pr.team && (
+                        <span className={`text-[9px] font-black px-1 rounded ${
+                          pr.team === 'A' ? 'bg-blue-500/20 text-blue-300' : 'bg-amber-500/20 text-amber-300'
+                        }`}>
+                          {pr.team}
+                        </span>
+                      )}
+                      <span className="font-semibold text-slate-300 truncate text-[11px]">{pr.name}</span>
+                    </div>
+                    <span className={`font-bold text-[11px] shrink-0 ${pr.isCorrect ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {pr.choice} {pr.isCorrect ? `(+${pr.scoreEarned})` : '(+0)'}
                     </span>
                   </div>
@@ -776,9 +961,15 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
   if (room && room.status === 'lobby') {
     const isHost = room.hostId === playerId;
     const myPlayer = room.players.find((p) => p.id === playerId);
-    const isRoomFull = room.players.length >= 4;
-    const canStart = room.players.length >= 2 && room.players.every((p) => p.ready);
+    const is2v2 = room.gameMode === '2v2';
+    const teamAPlayers = room.players.filter((p) => p.team === 'A');
+    const teamBPlayers = room.players.filter((p) => p.team === 'B');
+    const isRoomFull = is2v2 ? room.players.length >= 4 : room.players.length >= (room.maxPlayers || 4);
     const readyCount = room.players.filter((p) => p.ready).length;
+
+    const canStart = is2v2
+      ? room.players.length === 4 && teamAPlayers.length === 2 && teamBPlayers.length === 2 && room.players.every((p) => p.ready)
+      : room.players.length >= 2 && room.players.every((p) => p.ready);
 
     const playerColors = [
       { border: 'border-blue-500/40', bg: 'bg-blue-950/30', avatar: 'bg-blue-600', text: 'text-blue-400' },
@@ -787,11 +978,21 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
       { border: 'border-amber-500/40', bg: 'bg-amber-950/30', avatar: 'bg-amber-600', text: 'text-amber-400' },
     ];
 
+    const myTeam = myPlayer?.team;
+    const canSwitch = is2v2 && ((myTeam === 'A' && teamBPlayers.length < 2) || (myTeam === 'B' && teamAPlayers.length < 2));
+
     return (
       <div className="max-w-2xl mx-auto space-y-6 pb-20">
         {announcement && (
           <div className="p-3 rounded-xl bg-indigo-950 border border-indigo-500/40 text-indigo-300 text-xs text-center font-bold animate-in fade-in">
             {announcement}
+          </div>
+        )}
+
+        {errorMsg && (
+          <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-500/50 text-rose-300 text-xs text-center font-bold animate-in fade-in flex items-center justify-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            <span>{errorMsg}</span>
           </div>
         )}
 
@@ -803,20 +1004,43 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
           <div>
             <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
               <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                Multiplayer Lobby (2 – 4 Players)
+                {is2v2 ? '2v2 Team Battle Lobby (Exactly 4 Players)' : room.gameMode === '1v1' ? '1v1 Duel Lobby (2 Players)' : 'Free-for-All Lobby (2–4 Players)'}
               </span>
               {isRoomFull && (
                 <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
-                  Room Full (4/4 Players)
+                  Room Full ({room.players.length}/{room.maxPlayers || 4} Players)
                 </span>
               )}
             </div>
+
             <h1 className="text-2xl sm:text-3xl font-black text-white mt-1">
               Room Code: <span className="font-mono text-indigo-400 tracking-wider">{room.code}</span>
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              Share this 6-character code with up to 3 friends to battle together.
+              {is2v2
+                ? 'Share this 6-character code with 3 friends for a 2v2 Team Battle.'
+                : 'Share this 6-character code with friends to join the battle.'}
             </p>
+
+            {/* Prominent Team Badge for 2v2 */}
+            {is2v2 && myTeam && (
+              <div className="mt-3 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border bg-slate-950 shadow-md">
+                <span className="text-xs text-slate-400 font-semibold">Your Assignment:</span>
+                <span className={`text-xs font-black uppercase px-2 py-0.5 rounded-md ${
+                  myTeam === 'A' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                }`}>
+                  Team {myTeam}
+                </span>
+                {canSwitch && (
+                  <button
+                    onClick={handleSwitchTeam}
+                    className="text-[11px] text-indigo-400 hover:text-indigo-300 font-bold underline cursor-pointer ml-1"
+                  >
+                    Switch to Team {myTeam === 'A' ? 'B' : 'A'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Copy Button */}
@@ -845,86 +1069,213 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
               <strong className="text-white block capitalize">{room.difficulty} • {room.questionCount} Qs</strong>
             </div>
             <div>
-              <span className="text-slate-400 text-[10px] uppercase font-bold block">Timer & Capacity</span>
-              <strong className="text-white block">{room.timePerQuestion}s • {room.players.length}/4 Players</strong>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Mode & Capacity</span>
+              <strong className="text-white block">
+                {is2v2 ? '2v2 Teams' : room.gameMode === '1v1' ? '1v1 Duel' : 'Free-for-All'} • {room.players.length}/{room.maxPlayers || 4}
+              </strong>
             </div>
           </div>
 
-          {/* Player Roster Grid (4 Slots: Player 1, Player 2, Player 3, Player 4) */}
-          <div className="space-y-3 text-left">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Contenders ({room.players.length} / 4 Players)
-              </h3>
-              <span className="text-xs text-slate-400 font-semibold">
-                {readyCount} of {room.players.length} Ready
-              </span>
+          {/* Player Roster Grid */}
+          {is2v2 ? (
+            /* 2v2 TEAM VIEW: TEAM A VS TEAM B */
+            <div className="space-y-4 text-left">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Team Assignments (Exactly 4 Players Required)
+                </h3>
+                <span className="text-xs text-slate-400 font-semibold">
+                  {readyCount} of 4 Ready
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* TEAM A COLUMN */}
+                <div className="p-4 rounded-2xl bg-blue-950/20 border border-blue-500/30 space-y-3">
+                  <div className="flex items-center justify-between border-b border-blue-500/20 pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                      <span className="text-sm font-black text-blue-300">TEAM A</span>
+                      {myTeam === 'A' && <span className="text-[10px] bg-blue-500/30 text-blue-200 px-1.5 py-0.2 rounded font-bold">You</span>}
+                    </div>
+                    <span className="text-xs text-blue-300/80 font-bold">{teamAPlayers.length} / 2 Players</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {[0, 1].map((slotIdx) => {
+                      const player = teamAPlayers[slotIdx];
+                      if (player) {
+                        return (
+                          <div
+                            key={player.id}
+                            className={`p-3 rounded-xl border flex items-center justify-between bg-blue-950/40 border-blue-500/40 ${
+                              player.id === playerId ? 'ring-2 ring-blue-500/60' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                                {player.name.substring(0, 2).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1">
+                                  {player.isHost && <Crown className="w-3 h-3 text-amber-400 shrink-0" />}
+                                  <span className="font-bold text-white text-xs truncate">{player.name}</span>
+                                  {player.id === playerId && <span className="text-[10px] text-blue-300 font-bold">(You)</span>}
+                                </div>
+                                <span className="text-[10px] text-blue-300/70">Team A Player {slotIdx + 1}</span>
+                              </div>
+                            </div>
+
+                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg shrink-0 ${
+                              player.ready ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            }`}>
+                              {player.ready ? '✓ Ready' : '• Not Ready'}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={`empty_a_${slotIdx}`} className="p-3 rounded-xl border border-dashed border-blue-500/30 bg-blue-950/10 text-xs text-blue-300/50 flex items-center justify-between">
+                          <span>Waiting for teammate...</span>
+                          <span className="text-[10px] uppercase font-bold text-blue-400/40">Open Slot</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* TEAM B COLUMN */}
+                <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-500/30 space-y-3">
+                  <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                      <span className="text-sm font-black text-amber-300">TEAM B</span>
+                      {myTeam === 'B' && <span className="text-[10px] bg-amber-500/30 text-amber-200 px-1.5 py-0.2 rounded font-bold">You</span>}
+                    </div>
+                    <span className="text-xs text-amber-300/80 font-bold">{teamBPlayers.length} / 2 Players</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {[0, 1].map((slotIdx) => {
+                      const player = teamBPlayers[slotIdx];
+                      if (player) {
+                        return (
+                          <div
+                            key={player.id}
+                            className={`p-3 rounded-xl border flex items-center justify-between bg-amber-950/40 border-amber-500/40 ${
+                              player.id === playerId ? 'ring-2 ring-amber-500/60' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-amber-600 text-slate-950 font-black text-xs flex items-center justify-center shrink-0">
+                                {player.name.substring(0, 2).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1">
+                                  {player.isHost && <Crown className="w-3 h-3 text-amber-400 shrink-0" />}
+                                  <span className="font-bold text-white text-xs truncate">{player.name}</span>
+                                  {player.id === playerId && <span className="text-[10px] text-amber-300 font-bold">(You)</span>}
+                                </div>
+                                <span className="text-[10px] text-amber-300/70">Team B Player {slotIdx + 1}</span>
+                              </div>
+                            </div>
+
+                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg shrink-0 ${
+                              player.ready ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            }`}>
+                              {player.ready ? '✓ Ready' : '• Not Ready'}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={`empty_b_${slotIdx}`} className="p-3 rounded-xl border border-dashed border-amber-500/30 bg-amber-950/10 text-xs text-amber-300/50 flex items-center justify-between">
+                          <span>Waiting for opponent...</span>
+                          <span className="text-[10px] uppercase font-bold text-amber-400/40">Open Slot</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
+          ) : (
+            /* STANDARD 1v1 / FFA VIEW */
+            <div className="space-y-3 text-left">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Contenders ({room.players.length} / {room.maxPlayers || 4} Players)
+                </h3>
+                <span className="text-xs text-slate-400 font-semibold">
+                  {readyCount} of {room.players.length} Ready
+                </span>
+              </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {[0, 1, 2, 3].map((slotIdx) => {
-                const player = room.players[slotIdx];
-                const color = playerColors[slotIdx % playerColors.length];
-                const slotLabel = `Player ${slotIdx + 1}${slotIdx === 0 ? ' (Host)' : ''}`;
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {Array.from({ length: room.maxPlayers || 4 }).map((_, slotIdx) => {
+                  const player = room.players[slotIdx];
+                  const color = playerColors[slotIdx % playerColors.length];
+                  const slotLabel = `Player ${slotIdx + 1}${slotIdx === 0 ? ' (Host)' : ''}`;
 
-                if (player) {
+                  if (player) {
+                    return (
+                      <div
+                        key={player.id}
+                        className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between ${color.bg} ${color.border} ${
+                          player.id === playerId ? 'ring-2 ring-indigo-500/50' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-9 h-9 rounded-xl ${color.avatar} flex items-center justify-center font-black text-white text-xs shrink-0 shadow`}>
+                            {player.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              {player.isHost && <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                              <span className="font-bold text-white text-sm truncate">{player.name}</span>
+                              {player.id === playerId && <span className="text-[10px] text-indigo-400 font-bold shrink-0">(You)</span>}
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-medium block">
+                              {slotLabel}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className={`text-xs font-bold px-2 py-1 rounded-lg shrink-0 ${
+                          player.ready
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                        }`}>
+                          {player.ready ? '✓ Ready' : '• Not Ready'}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  // Empty Slot
                   return (
                     <div
-                      key={player.id}
-                      className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between ${color.bg} ${color.border} ${
-                        player.id === playerId ? 'ring-2 ring-indigo-500/50' : ''
-                      }`}
+                      key={`empty_slot_${slotIdx}`}
+                      className="p-3.5 rounded-2xl bg-slate-950/40 border border-dashed border-slate-800 flex items-center justify-between text-xs text-slate-500"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`w-9 h-9 rounded-xl ${color.avatar} flex items-center justify-center font-black text-white text-xs shrink-0 shadow`}>
-                          {player.name.substring(0, 2).toUpperCase()}
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-slate-800/60 border border-slate-700 flex items-center justify-center font-bold text-slate-500 text-xs">
+                          P{slotIdx + 1}
                         </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            {player.isHost && <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-                            <span className="font-bold text-white text-sm truncate">{player.name}</span>
-                            {player.id === playerId && <span className="text-[10px] text-indigo-400 font-bold shrink-0">(You)</span>}
-                          </div>
-                          <span className="text-[10px] text-slate-400 font-medium block">
-                            {slotLabel}
+                        <div>
+                          <span className="font-semibold block text-slate-400">{slotLabel}</span>
+                          <span className="text-[11px] text-slate-500">
+                            {slotIdx === 1 ? 'Waiting for opponent...' : 'Open slot'}
                           </span>
                         </div>
                       </div>
-
-                      <span className={`text-xs font-bold px-2 py-1 rounded-lg shrink-0 ${
-                        player.ready
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                          : 'bg-slate-800 text-slate-400 border border-slate-700'
-                      }`}>
-                        {player.ready ? '✓ Ready' : '• Not Ready'}
-                      </span>
+                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Empty</span>
                     </div>
                   );
-                }
-
-                // Empty Slot
-                return (
-                  <div
-                    key={`empty_slot_${slotIdx}`}
-                    className="p-3.5 rounded-2xl bg-slate-950/40 border border-dashed border-slate-800 flex items-center justify-between text-xs text-slate-500"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-slate-800/60 border border-slate-700 flex items-center justify-center font-bold text-slate-500 text-xs">
-                        P{slotIdx + 1}
-                      </div>
-                      <div>
-                        <span className="font-semibold block text-slate-400">{slotLabel}</span>
-                        <span className="text-[11px] text-slate-500">
-                          {slotIdx === 1 ? 'Waiting for opponent...' : 'Open slot (Optional)'}
-                        </span>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Empty</span>
-                  </div>
-                );
-              })}
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Lobby Controls */}
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -934,6 +1285,15 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
             >
               Leave Room
             </button>
+
+            {canSwitch && (
+              <button
+                onClick={handleSwitchTeam}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-indigo-500/40 hover:bg-indigo-950/40 text-indigo-300 text-xs font-bold transition cursor-pointer"
+              >
+                Switch to Team {myTeam === 'A' ? 'B' : 'A'}
+              </button>
+            )}
 
             <button
               onClick={handleToggleReady}
@@ -953,7 +1313,15 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
                 className="w-full sm:flex-1 py-3 px-6 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-extrabold text-sm shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Play className="w-4 h-4 fill-current" />
-                {room.players.length < 2
+                {is2v2
+                  ? room.players.length < 4
+                    ? `Waiting for 4 Players (${room.players.length}/4)...`
+                    : teamAPlayers.length !== 2 || teamBPlayers.length !== 2
+                    ? 'Balancing Teams (Need 2 on A, 2 on B)...'
+                    : !canStart
+                    ? `Waiting for All Players Ready (${readyCount}/4)`
+                    : 'Start 2v2 Team Battle (Team A vs Team B)'
+                  : room.players.length < 2
                   ? 'Waiting for Players (Min 2)...'
                   : !canStart
                   ? `Waiting for Ready (${readyCount}/${room.players.length})`
@@ -1022,10 +1390,69 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
 
       {tab === 'create' ? (
         <form onSubmit={handleCreateRoom} className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
+          {/* Battle Mode Selection */}
+          <div>
+            <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
+              1. Choose Battle Mode
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playClick();
+                  setGameMode('1v1');
+                }}
+                className={`p-3 rounded-xl border text-center transition cursor-pointer ${
+                  gameMode === '1v1'
+                    ? 'bg-blue-600/30 border-blue-500 text-white shadow-md ring-1 ring-blue-500 font-bold'
+                    : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-600'
+                }`}
+              >
+                <div className="font-extrabold text-sm">1v1</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">2 Players</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playClick();
+                  setGameMode('ffa');
+                }}
+                className={`p-3 rounded-xl border text-center transition cursor-pointer ${
+                  gameMode === 'ffa'
+                    ? 'bg-purple-600/30 border-purple-500 text-white shadow-md ring-1 ring-purple-500 font-bold'
+                    : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-600'
+                }`}
+              >
+                <div className="font-extrabold text-sm">Free-for-All</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Up to 4 Players</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playClick();
+                  setGameMode('2v2');
+                }}
+                className={`p-3 rounded-xl border text-center transition cursor-pointer ${
+                  gameMode === '2v2'
+                    ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-md ring-1 ring-amber-500 font-black'
+                    : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-600'
+                }`}
+              >
+                <div className="font-extrabold text-sm flex items-center justify-center gap-1">
+                  <span>2v2 Battle</span>
+                  <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500 text-slate-950 font-black">NEW</span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Team A vs Team B</div>
+              </button>
+            </div>
+          </div>
+
           {/* Subject Selection */}
           <div>
             <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
-              1. Choose Subject
+              2. Choose Subject
             </label>
             <select
               value={subject}
@@ -1047,7 +1474,7 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
           {/* Topic Selection */}
           <div>
             <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
-              2. Choose Topic
+              3. Choose Topic
             </label>
             <select
               value={topic}
@@ -1068,7 +1495,7 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
-                3. Difficulty
+                4. Difficulty
               </label>
               <select
                 value={difficulty}
@@ -1083,7 +1510,7 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
 
             <div>
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
-                4. Questions
+                5. Questions
               </label>
               <select
                 value={questionCount}
@@ -1099,7 +1526,7 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
 
             <div>
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
-                5. Timer
+                6. Timer
               </label>
               <select
                 value={timePerQuestion}
@@ -1119,7 +1546,9 @@ export const MultiplayerView: React.FC<MultiplayerViewProps> = ({
             disabled={loading}
             className="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-extrabold text-sm shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            {loading ? 'Creating Room...' : 'Create Room (2–4 Players) & Get Code'}
+            {loading
+              ? 'Creating Room...'
+              : `Create ${gameMode === '1v1' ? '1v1 Duel' : gameMode === '2v2' ? '2v2 Team Battle' : 'Free-for-All'} Room & Get Code`}
           </button>
         </form>
       ) : (

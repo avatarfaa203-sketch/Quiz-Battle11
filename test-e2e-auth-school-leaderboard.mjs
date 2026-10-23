@@ -35,9 +35,10 @@ async function runAuthAndSchoolTests() {
   console.log('🧪 TESTING COMPULSORY AUTH, USERNAME UNIQUENESS & SCHOOL CHALLENGE');
   console.log('================================================================');
 
+  const uid = Date.now().toString().slice(-6);
   const testUser1 = {
-    username: 'AkosuaScholar',
-    email: 'akosua@achimota.edu.gh',
+    username: `Akosua${uid}`,
+    email: `akosua${uid}@achimota.edu.gh`,
     password: 'Password123!',
     schoolName: 'Achimota School',
     shsLevel: 'SHS 2',
@@ -75,8 +76,8 @@ async function runAuthAndSchoolTests() {
   // 3. Test existing username rejection
   console.log('\n>>> 3. Testing Existing Username detection and uniqueness...');
   const regDuplicateUsername = await post('/api/auth/register', {
-    username: 'akosuascholar', // case-insensitive duplicate check
-    email: 'another_student@school.edu.gh',
+    username: testUser1.username.toLowerCase(), // case-insensitive duplicate check
+    email: `another_${uid}@school.edu.gh`,
     password: 'Password123!',
     schoolName: 'Prempeh College',
   });
@@ -119,8 +120,8 @@ async function runAuthAndSchoolTests() {
 
   // Register second student from same school to test school XP accumulation
   const testUser2 = {
-    username: 'KofiGenius',
-    email: 'kofi@achimota.edu.gh',
+    username: `Kofi${uid}`,
+    email: `kofi${uid}@achimota.edu.gh`,
     password: 'Password123!',
     schoolName: 'Achimota School',
     shsLevel: 'SHS 2',
@@ -143,8 +144,8 @@ async function runAuthAndSchoolTests() {
 
   // Register third student from different school
   const testUser3 = {
-    username: 'PrempehAce',
-    email: 'ace@prempeh.edu.gh',
+    username: `Prempeh${uid}`,
+    email: `ace${uid}@prempeh.edu.gh`,
     password: 'Password123!',
     schoolName: 'Prempeh College',
     shsLevel: 'SHS 3',
@@ -180,10 +181,10 @@ async function runAuthAndSchoolTests() {
   console.log(`✓ Schools ranked on School Challenge Leaderboard (${schools.length}):`);
   schools.forEach((sc) => console.log(`   #${sc.rank} ${sc.schoolName}: ${sc.totalXp} XP (${sc.studentCount} students)`));
 
-  // Verify Achimota School has 2 students
+  // Verify Achimota School has at least 2 students
   const achimota = schools.find((s) => s.schoolName === 'Achimota School');
-  if (!achimota || achimota.studentCount !== 2) {
-    throw new Error(`Expected Achimota School to have 2 students, got ${JSON.stringify(achimota)}`);
+  if (!achimota || achimota.studentCount < 2) {
+    throw new Error(`Expected Achimota School to have at least 2 students, got ${JSON.stringify(achimota)}`);
   }
 
   // Verify user's personal school stats

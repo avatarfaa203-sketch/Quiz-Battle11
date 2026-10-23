@@ -51,6 +51,7 @@ export interface UserStats {
   currentStreak: number;
   bestStreak: number;
   lastPlayedDate?: string; // YYYY-MM-DD
+  lastDailyChallengeDate?: string; // YYYY-MM-DD for anti-farming check
   multiplayerWins: number;
   multiplayerLosses: number;
   unlockedBadgeIds: string[];
@@ -124,6 +125,9 @@ export interface StudentSchoolStats {
   contributionPercent: number;
 }
 
+export type MultiplayerMode = '1v1' | 'ffa' | '2v2';
+export type MultiplayerTeam = 'A' | 'B';
+
 export interface MultiplayerPlayer {
   id: string;
   name: string;
@@ -132,6 +136,7 @@ export interface MultiplayerPlayer {
   score: number;
   correctAnswers: number;
   totalAnswered: number;
+  team?: MultiplayerTeam;
   currentAnswer?: {
     choice: string;
     isCorrect: boolean;
@@ -158,6 +163,7 @@ export interface ReviewData {
   playerResults: Array<{
     id: string;
     name: string;
+    team?: MultiplayerTeam;
     choice: string;
     isCorrect: boolean;
     scoreEarned: number;
@@ -168,9 +174,19 @@ export interface ReviewData {
 export interface MultiplayerFinalResults {
   winnerId: string | null;
   isDraw: boolean;
+  gameMode?: MultiplayerMode;
+  winningTeam?: MultiplayerTeam | 'draw' | null;
+  teamScores?: {
+    teamA: number;
+    teamB: number;
+    teamAPlayers: Array<{ id: string; name: string; score: number; correctAnswers: number }>;
+    teamBPlayers: Array<{ id: string; name: string; score: number; correctAnswers: number }>;
+  };
   finalScores: Array<{
     id: string;
     name: string;
+    team?: MultiplayerTeam;
+    isWinningTeam?: boolean;
     score: number;
     correctAnswers: number;
     totalQuestions: number;
@@ -189,6 +205,9 @@ export interface MultiplayerRoomState {
   questionCount: number;
   timePerQuestion: number;
   maxPlayers: number;
+  gameMode?: MultiplayerMode;
+  winningTeam?: MultiplayerTeam | 'draw' | null;
+  teamScores?: { teamA: number; teamB: number };
   status: 'lobby' | 'playing' | 'question_review' | 'finished';
   createdAt: number;
   players: MultiplayerPlayer[];
